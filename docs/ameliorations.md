@@ -55,8 +55,11 @@ Ma préférence est la A : le vert d'eau tranche avec le bleu actuel, et l'ambre
 - Job inconnu (404) : message clair, identifiant effacé.
 - Copier : le presse-papiers contient tout le texte.
 
+**Deux niveaux, parce que la CI n'a pas de GPU**
+- **Niveau local, avec le vrai modèle** : Docker et GPU, le garde-fou avant fusion. Une vidéo courte suffit (`KnXm3PbNz5A`, 15 min, environ 30 s de transcription d'après l'ADR). Un montage jetable ne trouve que ce qu'on a pensé à y mettre, donc ce niveau ne se remplace pas.
+- **Niveau CI, sans GPU** : la page et l'API tournent avec un transcripteur factice, ce qui couvre les cinq scénarios ci-dessus mais pas Whisper. Il demande un réglage explicite qui choisit le transcripteur factice (variable d'environnement, jamais actif par défaut), car `Transcriber` vise `cuda` en dur.
+
 **À respecter**
-- Tourner contre la vraie application, avec Docker et le GPU, pas contre un montage jetable. Une vidéo courte suffit (`KnXm3PbNz5A`, 15 min, environ 30 s de transcription d'après l'ADR).
 - Lancer Playwright dans un conteneur, comme pour la revue, pour ne rien installer sur la machine. Chromium en root demande `--no-sandbox`.
 - Coller avec `Shift+Insert` : mesuré pendant le MVP, `Ctrl+V` ne colle rien dans Chromium headless.
 - Rangement et lanceur (dossier `tests/e2e/`, service Compose dédié ou commande `docker run`) à trancher à l'implémentation, avec `pytest-playwright` ou le script brut (supposé : les deux conviennent).
@@ -71,7 +74,7 @@ Classées par intérêt, du plus rentable au plus lointain.
 | 5 | **Titre, chaîne et durée de la vidéo** affichés dès le lancement | on vérifie qu'on a collé la bonne vidéo avant d'attendre plusieurs minutes |
 | 6 | **Télécharger le texte en `.txt`**, avec le titre de la vidéo en première ligne | le texte part ensuite vers le skill de résumé, le titre lui sert de contexte |
 | 7 | **Annuler un job en cours** | aujourd'hui un mauvais collage bloque le GPU jusqu'à la fin, et un second job reçoit un 409 |
-| 8 | **CI GitHub Actions** qui lance les 23 tests | le dépôt n'en a pas, la PR #1 a été validée à la main |
+| 8 | **CI GitHub Actions**, sans GPU : les 23 tests pytest et l'e2e Playwright avec transcripteur factice | le dépôt n'en a pas, la PR #1 a été validée à la main. Les runners GitHub standard n'ont pas de GPU (supposé, à vérifier dans la doc), donc le modèle réel reste testé en local avant fusion. Un runner auto-hébergé sur ta machine pourrait le lancer, mais sur un dépôt public il exécuterait le code des PR, à ne considérer que dépôt privé |
 | 9 | **Healthcheck Compose** sur la fin du chargement du modèle | le premier démarrage télécharge 1,6 Go et la page n'est servie qu'après |
 | 10 | **Hotwords modifiables depuis la page** | aujourd'hui il faut relancer le conteneur avec `HOTWORDS` |
 | 11 | **Mesurer l'anglais** sur 2 ou 3 vidéos, avec un jeu de référence | l'ADR note la qualité en anglais comme supposée, non mesurée |
