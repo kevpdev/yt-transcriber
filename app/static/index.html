@@ -48,30 +48,50 @@
       try { return (await resp.json()).detail || resp.statusText; } catch { return resp.statusText; }
     }
 
-    async function poll(id) {
+    const KEY = "yt-transcriber-job";
+    const MAX_RETRIES = 5;
+
+    function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY); } catch {} }
+    function remembered() { try { return localStorage.getItem(KEY); } catch { return null; } }
+
+    function stop(message) {
+      remember(null);
+      if (message) showError(message);
+      setBusy(false);
+    }
+
+    async function poll(id, failures = 0) {
+      let job;
       try {
         const resp = await fetch(`/jobs/${id}`);
-        if (!resp.ok) throw new Error(await readError(resp));
-        const job = await resp.json();
-        if (job.stage === "done") {
-          $("out").value = job.text;
-          $("status").textContent = "Terminé.";
-          setBusy(false);
-          return;
-        }
-        if (job.stage === "error") {
-          showError(job.error);
+        if (resp.status === 404) {
           $("status").textContent = "";
-          setBusy(false);
-          return;
+          return stop("Ce job n'existe plus, le serveur a sûrement redémarré. Relance la transcription.");
         }
-        const pct = job.stage === "transcribing" ? ` · ${Math.round(job.progress * 100)} %` : "";
-        $("status").textContent = (STAGES[job.stage] || job.stage) + pct;
+        if (!resp.ok) throw new Error(await readError(resp));
+        job = await resp.json();
       } catch (e) {
-        showError("Le serveur ne répond pas : " + e.message);
-        setBusy(false);
+        if (failures + 1 >= MAX_RETRIES) {
+          $("status").textContent = "";
+          showError("Le serveur ne répond pas : " + e.message + ". Recharge la page pour reprendre le job.");
+          return setBusy(false);
+        }
+        $("status").textContent = "Connexion perdue, nouvelle tentative…";
+        timer = setTimeout(() => poll(id, failures + 1), 2000);
         return;
       }
+      showError("");
+      if (job.stage === "done") {
+        $("out").value = job.text;
+        $("status").textContent = "Terminé.";
+        return stop();
+      }
+      if (job.stage === "error") {
+        $("status").textContent = "";
+        return stop(job.error);
+      }
+      const pct = job.stage === "transcribing" ? ` · ${Math.round(job.progress * 100)} %` : "";
+      $("status").textContent = (STAGES[job.stage] || job.stage) + pct;
       timer = setTimeout(() => poll(id), 2000);
     }
 
@@ -93,12 +113,21 @@
           return;
         }
         $("status").textContent = "En attente";
-        poll((await resp.json()).id);
+        const { id } = await resp.json();
+        remember(id);
+        poll(id);
       } catch (e) {
         showError("Le serveur ne répond pas : " + e.message);
         setBusy(false);
       }
     });
+
+    const resumed = remembered();
+    if (resumed) {
+      setBusy(true);
+      $("status").textContent = "Reprise du job en cours…";
+      poll(resumed);
+    }
 
     $("copy").addEventListener("click", async () => {
       const text = $("out").value;
