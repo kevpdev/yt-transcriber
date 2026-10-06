@@ -1,0 +1,19 @@
+services:
+  yt-transcriber:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      HOTWORDS: ${HOTWORDS:-Claude Code, Claude, Anthropic, MCP}
+    volumes:
+      - hf-cache:/hf
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  hf-cache:

@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+faster-whisper==1.2.1
+av>=15,<16
+yt-dlp
+deno
