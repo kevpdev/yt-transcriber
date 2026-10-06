@@ -42,18 +42,36 @@ Backlog des évolutions après le MVP (PR #1). Une entrée par sujet, dans l'ord
 
 Ma préférence est la A : le vert d'eau tranche avec le bleu actuel, et l'ambre ressort sur fond sombre comme sur fond clair. La B est la plus contrastée, la C la plus sobre.
 
+### 3. Tests e2e avec Playwright
+
+**Objectif** : versionner dans le dépôt les vérifications de la page faites à la main pendant la revue du MVP, pour les rejouer à chaque changement du design ou de la télémétrie.
+
+**Pourquoi** : les scripts de la revue vivent aujourd'hui hors du dépôt, et le nouveau design touche la page entière.
+
+**Scénarios à couvrir**
+- URL invalide : message lisible, bouton réactivé, application toujours vivante.
+- Rechargement de la page pendant un job : la page reprend le suivi et affiche le texte final.
+- Coupure réseau brève : « Connexion perdue, nouvelle tentative… », puis la fin normale.
+- Job inconnu (404) : message clair, identifiant effacé.
+- Copier : le presse-papiers contient tout le texte.
+
+**À respecter**
+- Tourner contre la vraie application, avec Docker et le GPU, pas contre un montage jetable. Une vidéo courte suffit (`KnXm3PbNz5A`, 15 min, environ 30 s de transcription d'après l'ADR).
+- Lancer Playwright dans un conteneur, comme pour la revue, pour ne rien installer sur la machine. Chromium en root demande `--no-sandbox`.
+- Coller avec `Shift+Insert` : mesuré pendant le MVP, `Ctrl+V` ne colle rien dans Chromium headless.
+- Rangement et lanceur (dossier `tests/e2e/`, service Compose dédié ou commande `docker run`) à trancher à l'implémentation, avec `pytest-playwright` ou le script brut (supposé : les deux conviennent).
+
 ## Suggestions
 
 Classées par intérêt, du plus rentable au plus lointain.
 
 | # | Suggestion | Pourquoi |
 |---|---|---|
-| 3 | **Limite de durée sur un job** et refus des directs en cours (`/live/ID`) | relevé par la revue du MVP : un direct sans fin garderait le verrou pris jusqu'au redémarrage du conteneur (supposé, non mesuré) |
-| 4 | **Titre, chaîne et durée de la vidéo** affichés dès le lancement | on vérifie qu'on a collé la bonne vidéo avant d'attendre plusieurs minutes |
-| 5 | **Télécharger le texte en `.txt`**, avec le titre de la vidéo en première ligne | le texte part ensuite vers le skill de résumé, le titre lui sert de contexte |
-| 6 | **Annuler un job en cours** | aujourd'hui un mauvais collage bloque le GPU jusqu'à la fin, et un second job reçoit un 409 |
-| 7 | **CI GitHub Actions** qui lance les 23 tests | le dépôt n'en a pas, la PR #1 a été validée à la main |
-| 8 | **Test e2e Playwright versionné** (reprise de job, copier, URL invalide) | les scripts utilisés pour la revue vivent hors du dépôt |
+| 4 | **Limite de durée sur un job** et refus des directs en cours (`/live/ID`) | relevé par la revue du MVP : un direct sans fin garderait le verrou pris jusqu'au redémarrage du conteneur (supposé, non mesuré) |
+| 5 | **Titre, chaîne et durée de la vidéo** affichés dès le lancement | on vérifie qu'on a collé la bonne vidéo avant d'attendre plusieurs minutes |
+| 6 | **Télécharger le texte en `.txt`**, avec le titre de la vidéo en première ligne | le texte part ensuite vers le skill de résumé, le titre lui sert de contexte |
+| 7 | **Annuler un job en cours** | aujourd'hui un mauvais collage bloque le GPU jusqu'à la fin, et un second job reçoit un 409 |
+| 8 | **CI GitHub Actions** qui lance les 23 tests | le dépôt n'en a pas, la PR #1 a été validée à la main |
 | 9 | **Healthcheck Compose** sur la fin du chargement du modèle | le premier démarrage télécharge 1,6 Go et la page n'est servie qu'après |
 | 10 | **Hotwords modifiables depuis la page** | aujourd'hui il faut relancer le conteneur avec `HOTWORDS` |
 | 11 | **Mesurer l'anglais** sur 2 ou 3 vidéos, avec un jeu de référence | l'ADR note la qualité en anglais comme supposée, non mesurée |
