@@ -4,7 +4,7 @@ Where the project runs and how it ships: CI/CD, environments, and release.
 
 ## Pipeline
 
-- No build or deploy pipeline, only a Trivy scan on pull requests (`.github/workflows/trivy.yml`) and weekly Dependabot updates (`.github/dependabot.yml`). The image is built and run on the user's machine with `docker compose up --build`.
+- No build or deploy pipeline. On pull requests to `main`, CI runs a Trivy scan (`.github/workflows/trivy.yml`) and `.github/workflows/ci.yml`, whose two jobs run `scripts/check.sh` and `scripts/e2e.sh fake` on standard runners, without GPU. Dependabot updates weekly (`.github/dependabot.yml`). The image is built and run on the user's machine with `docker compose up --build`.
 - One Compose service, one image on `python:3.12-slim` plus the CUDA libraries from pip.
 
 ## Environments

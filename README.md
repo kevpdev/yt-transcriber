@@ -71,6 +71,8 @@ scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec Y
 scripts/e2e.sh real   # Docker et GPU : le vrai modèle, sur la vidéo KnXm3PbNz5A
 ```
 
+La CI GitHub (`.github/workflows/ci.yml`) lance `scripts/check.sh` et `scripts/e2e.sh fake` sur chaque pull request vers `main`. Le niveau `real` reste local.
+
 Docker et `curl` doivent être présents sur l'hôte. `fake` construit l'image et lance l'appli avec un transcripteur factice (job d'environ 10 s). `real` lance `docker compose up` et exige le GPU, `nvidia-container-toolkit` et internet (YouTube). Les deux refusent de démarrer si le port 8000 est pris ou si une pile de l'appli tourne déjà, et libèrent le port à la fin, y compris sur Ctrl-C.
 
 ## Mesure de référence
