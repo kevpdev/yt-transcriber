@@ -11,7 +11,7 @@ FAST=0
 exec docker run --rm -e FAST="$FAST" -v "$ROOT":/src:ro python:3.12-slim sh -c '
 set -e
 cp -r /src /work && cd /work
-pip install -q uv
+pip install -q uv==0.12.23
 export UV_PROJECT_ENVIRONMENT=/opt/venv VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
 uv sync -q --frozen --group dev
 echo "1/4 ruff format" && ruff format --check app tests

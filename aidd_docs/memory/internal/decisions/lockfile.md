@@ -34,7 +34,7 @@ On passe à `uv`, avec `pyproject.toml` pour la déclaration et `uv.lock` pour l
 ## Vérifications faites le 2026-10-07
 
 - **Dependabot** gère l'écosystème `uv` pour les mises à jour de version (doc `supported-package-managers.md`). Pour les mises à jour de sécurité, la doc dépend d'un drapeau GitHub, non confirmé pour ce dépôt.
-- **Build** : `uv sync --frozen --no-install-project --group gpu` dans `python:3.12-slim` passe en 2 min, image de 4,79 Go contre 4,76 Go aujourd'hui.
+- **Build** : `uv sync --frozen --no-install-project --no-dev --group gpu` dans `python:3.12-slim` passe en 2 min, image de 4,77 Go contre 4,76 Go aujourd'hui. Sans `--no-dev`, `uv sync` installe le groupe `dev` par défaut et l'image grossit de 0,4 Go (ruff, pyright, pytest).
 - **GPU** : dans cette image, `entrypoint.sh` trouve les libs `nvidia-*`, `ctranslate2` voit 1 GPU, et la vidéo `KnXm3PbNz5A` (15 min) est transcrite en 35 s, 3 680 mots, sans erreur. `stack.md` mesure 30 s avec l'image actuelle.
 - **PyAV** reste en `15.1.0` avec la borne `<16`. La PR #24 propose `av>=19.0.1`, qui casse faster-whisper d'après `stack.md`.
 
@@ -45,6 +45,6 @@ Après `uv pip install --upgrade yt-dlp`, l'image porte une version de `yt-dlp` 
 ## Conséquences
 
 - Deux builds du même commit installent les mêmes versions, sauf `yt-dlp`, qui suit YouTube comme avant.
-- Le scan Trivy couvre l'arbre complet sans étape ajoutée au workflow.
-- `Dockerfile`, `scripts/check.sh` et `requirements-dev.txt` changent. `requirements.txt` disparaît.
+- Le scan Trivy couvre l'arbre complet sans étape de résolution. Trivy traite tout `[dependency-groups]` comme des dépendances de dev et les ignore, y compris `gpu` (mesuré sur 0.70.0, le défaut de trivy-action). Le workflow pose donc `TRIVY_INCLUDE_DEV_DEPS: 'true'`, et ruff, pyright et pytest sont scannés aussi.
+- `Dockerfile` et `scripts/check.sh` changent, `requirements.txt` et `requirements-dev.txt` disparaissent. `uv` est épinglé à la même version dans les deux.
 - Le lockfile s'ajoute au diff de chaque mise à jour de dépendance.
