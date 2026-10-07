@@ -1,18 +1,18 @@
 #!/bin/sh
-# Chaîne de contrôle, du plus déterministe au plus lent, arrêtée à la première étape en échec.
-#   1 ruff format --check   mise en forme
+# Check chain, from the most deterministic to the slowest, stopped at the first failing step.
+#   1 ruff format --check   formatting
 #   2 ruff check            lint
 #   3 pyright               types
-#   4 pytest                tests unitaires et API, seuil de couverture 80 %
-# Tout tourne dans un conteneur python:3.12-slim : seul Docker est requis sur l'hôte, en local comme en CI.
-# `--fast` s'arrête après le typecheck (étapes 1 à 3), c'est ce que lance le hook pre-commit.
+#   4 pytest                unit and API tests, 80 % coverage threshold
+# Everything runs in a python:3.12-slim container: only Docker is needed on the host, locally and in CI.
+# `--fast` stops after the typecheck (steps 1 to 3), which is what the pre-commit hook runs.
 set -e
 
 ROOT=${CHECK_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 FAST=0
 [ "$1" = "--fast" ] && FAST=1
 
-# Le montage est en lecture seule : les outils travaillent sur une copie dans le conteneur.
+# The mount is read-only: the tools work on a copy inside the container.
 exec docker run --rm -e FAST="$FAST" -v "$ROOT":/src:ro python:3.12-slim sh -c '
 set -e
 cp -r /src /work && cd /work
