@@ -21,7 +21,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 ## Run
 
-- The `docker run` command in `coding-assertions.md`.
+- `scripts/check.sh`, the commands are in `coding-assertions.md`.
 
 ## Browser QA
 

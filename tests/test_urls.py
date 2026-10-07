@@ -23,8 +23,16 @@ def test_accepts_youtube_urls(url):
 
 @pytest.mark.parametrize(
     "url",
-    ["", "   ", "abc", "https://example.com/watch?v=" + VID, "ftp://youtube.com/watch?v=" + VID,
-     "https://www.youtube.com/watch", "https://www.youtube.com/watch?v=court", "https://www.youtube.com/"],
+    [
+        "",
+        "   ",
+        "abc",
+        "https://example.com/watch?v=" + VID,
+        "ftp://youtube.com/watch?v=" + VID,
+        "https://www.youtube.com/watch",
+        "https://www.youtube.com/watch?v=court",
+        "https://www.youtube.com/",
+    ],
 )
 def test_rejects_other_input_with_a_message(url):
     with pytest.raises(InvalidUrl) as exc:

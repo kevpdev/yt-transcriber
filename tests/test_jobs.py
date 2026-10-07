@@ -29,6 +29,7 @@ def fake_download(url, dest):
 
 
 def wait_for(client, job_id, stages=(j.DONE, j.ERROR)):
+    body = {}
     for _ in range(100):
         body = client.get(f"/jobs/{job_id}").json()
         if body["stage"] in stages:
@@ -58,7 +59,9 @@ def test_happy_path_returns_raw_text():
     resp = client.post("/jobs", json={"url": URL})
     assert resp.status_code == 202
     body = wait_for(client, resp.json()["id"])
-    assert body["stage"] == j.DONE and body["text"] == "bonjour le monde" and body["progress"] == 1.0
+    assert (
+        body["stage"] == j.DONE and body["text"] == "bonjour le monde" and body["progress"] == 1.0
+    )
 
 
 def test_invalid_url_gives_422_and_app_keeps_running():

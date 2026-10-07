@@ -4,13 +4,23 @@ The checks that must pass for code to count as done. Minimal, run after every ch
 
 ## Before commit
 
-The fast gate.
+The fast gate, steps 1 to 3 of `scripts/check.sh --fast`. The pre-commit hook runs it on the staged content.
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
-| 1 | `docker run --rm -v "$PWD":/src:ro -w /src python:3.12-slim sh -c "pip install -q -r requirements-dev.txt && python -m pytest -q -p no:cacheprovider"` | the pytest suite, no GPU needed |
+| 1 | `ruff format --check app tests` | formatting |
+| 2 | `ruff check app tests` | lint (`E,F,I,UP,B,BLE`) |
+| 3 | `pyright` | types |
 
-No linter, formatter or type checker is wired up.
+## Before push
+
+The full chain, `scripts/check.sh`: steps 1 to 3, then step 4.
+
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 4 | `python -m pytest -q -p no:cacheprovider` | the pytest suite, no GPU needed, with the 80 % coverage threshold |
+
+The tools run in a `python:3.12-slim` container on a copy of the repo, `scripts/check.sh` does the setup. It stops at the first failing step.
 
 ## Behavior
 

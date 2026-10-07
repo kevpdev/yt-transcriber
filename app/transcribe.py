@@ -1,6 +1,6 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 MODEL = "large-v3-turbo"
 DEFAULT_HOTWORDS = "Claude Code, Claude, Anthropic, MCP"
@@ -20,6 +20,8 @@ class Transcriber:
         self.model = WhisperModel(MODEL, device="cuda", compute_type="float16")
 
     def run(self, audio: Path, on_progress: Callable[[float], None]) -> str:
+        if self.model is None:
+            raise RuntimeError("Le modèle n'est pas chargé, appeler load() d'abord.")
         segments, info = self.model.transcribe(
             str(audio),
             language=None,
