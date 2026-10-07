@@ -21,6 +21,13 @@ wait_for_page() {
   done
 }
 
+ensure_port_free() {
+  if curl -s -o /dev/null --max-time 2 http://localhost:8000/; then
+    echo "le port 8000 est déjà utilisé : arrête ce qui répond (docker compose down) avant de lancer les e2e" >&2
+    exit 1
+  fi
+}
+
 run_suite() {
   # Le montage est en lecture seule : pytest travaille sur une copie dans le conteneur.
   docker run --rm --network host -e E2E_VIDEO_URL \
@@ -34,6 +41,7 @@ python -m pytest e2e -p no:cacheprovider
 
 case "$LEVEL" in
   fake)
+    ensure_port_free
     trap 'docker rm -f "$APP_NAME" >/dev/null 2>&1 || true' EXIT
     docker build -q -t "$APP_IMAGE" "$ROOT" >/dev/null
     docker run -d --rm --name "$APP_NAME" -e YT_FAKE=1 --network host "$APP_IMAGE" >/dev/null
@@ -41,6 +49,7 @@ case "$LEVEL" in
     run_suite
     ;;
   real)
+    ensure_port_free
     trap 'docker compose -f "$ROOT/compose.yaml" down >/dev/null 2>&1 || true' EXIT
     docker compose -f "$ROOT/compose.yaml" up -d --build
     # La page n'est servie qu'une fois le modèle chargé, le premier démarrage le télécharge.

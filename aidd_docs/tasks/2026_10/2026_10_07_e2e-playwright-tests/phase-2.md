@@ -89,3 +89,13 @@ journey
 | 1    | Each of the five scenarios fails when its page behavior is broken, checked by one deliberate break per test |
 | 2    | `scripts/e2e.sh fake` passes on a machine without GPU access and leaves no container behind                 |
 | 2    | `scripts/check.sh` script is unchanged and still passes, `pyproject.toml` gets `testpaths = ["tests"]` so `e2e/` is outside its scope |
+
+## Deliberate breaks, one per test
+
+Each edit to `app/static/index.html`, reverted after the run, makes its own test fail under `scripts/e2e.sh fake`.
+
+- Invalid URL: the 422 detail replaced by the HTTP status text, `test_invalid_url_shows_a_message_and_keeps_the_page_usable` fails.
+- Reload: the resume line renamed, `test_reload_during_a_job_resumes_it` fails (the network test follows, the failed job still runs and the server takes one at a time).
+- Network cut: `MAX_RETRIES = 1`, `test_brief_network_cut_is_retried` fails.
+- Unknown job: `remember(null)` removed, `test_unknown_job_is_cleared` fails.
+- Copy: only 10 characters copied, `test_copy_puts_the_whole_text_in_the_clipboard` fails.

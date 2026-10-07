@@ -24,7 +24,7 @@ def test_invalid_url_shows_a_message_and_keeps_the_page_usable(page, base_url):
     page.goto(base_url)
     page.fill("#url", "not-a-url")
     page.click("#go")
-    expect(page.locator("#error")).not_to_be_empty()
+    expect(page.locator("#error")).to_contain_text("Ce n'est pas une URL http(s)")
     expect(page.locator("#go")).to_be_enabled()
     assert page.request.get(base_url).status == 200
 
