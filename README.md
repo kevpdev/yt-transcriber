@@ -49,6 +49,17 @@ Pour que `git commit` lance les trois premières étapes sur le contenu indexé 
 git config core.hooksPath scripts/hooks
 ```
 
+### Tests de bout en bout de la page
+
+Cinq contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
+
+```sh
+scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1
+scripts/e2e.sh real   # Docker et GPU : le vrai modèle, sur la vidéo KnXm3PbNz5A
+```
+
+Docker et `curl` doivent être présents sur l'hôte. `fake` construit l'image et lance l'appli avec un transcripteur factice (job d'environ 10 s). `real` lance `docker compose up` et exige le GPU, `nvidia-container-toolkit` et internet (YouTube). Les deux refusent de démarrer si le port 8000 est pris ou si une pile de l'appli tourne déjà, et libèrent le port à la fin, y compris sur Ctrl-C.
+
 ## Mesure de référence
 
 Vidéo publique de test : [`gsxiFd8AZQU`](https://www.youtube.com/watch?v=gsxiFd8AZQU), « Claude Code : Tout comprendre en une vidéo », **55 min 59 s**, en français.

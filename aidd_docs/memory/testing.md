@@ -4,9 +4,9 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 ## Strategy
 
-- Unit and API-level tests only, run without a GPU and without network.
-- `create_app` takes the transcriber and the downloader as arguments, so tests inject fakes (`FakeTranscriber`, `fake_download`) and drive the real routes.
-- The real Whisper model and the real yt-dlp download are not covered by any test. The README measure on the reference video is the only check of that path.
+- Unit and API-level tests in `tests/`, run without a GPU and without network.
+- `create_app` takes the transcriber and the downloader as arguments, so tests inject fakes and drive the real routes. `tests/test_jobs.py` defines its own `FakeTranscriber` and `fake_download`, and `app/fake.py` holds the pair that `YT_FAKE=1` and `tests/test_fake.py` use.
+- Browser end-to-end tests in `e2e/`, at two levels, see the E2E section. The `real` level is the check of the real Whisper model and yt-dlp path, on video `KnXm3PbNz5A`.
 
 ## Tools
 
@@ -22,6 +22,15 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 ## Run
 
 - `scripts/check.sh`, the commands are in `coding-assertions.md`.
+
+## E2E
+
+- `e2e/` holds five Playwright scenarios (invalid URL, reload during a job, brief network cut, unknown job, copy), the same suite at both levels. `scripts/e2e.sh` forwards `E2E_VIDEO_URL` and `E2E_LEVEL` (`fake` or `real`) to the container. `E2E_BASE_URL` only applies when pytest is run directly against another server.
+- `scripts/e2e.sh fake`: Docker only. The app image runs with `YT_FAKE=1`, which swaps in the fake transcriber and downloader (a job takes about 10 s), and a Playwright container drives it.
+- `scripts/e2e.sh real`: Docker and the NVIDIA GPU. `docker compose up` runs the real model, the suite targets `KnXm3PbNz5A`.
+- `YT_FAKE` is read only in `build_app` and is never set by `compose.yaml`.
+- Outside `scripts/check.sh` on purpose: the check container has no Playwright, so `pyproject.toml` sets pytest `testpaths = ["tests"]`, and `ruff` and `pyright` only cover `app` and `tests`.
+- The Playwright image tag and `e2e/requirements.txt` are pinned to the same version (`playwright` 1.63.0, `pytest-playwright` 0.9.0).
 
 ## Browser QA
 

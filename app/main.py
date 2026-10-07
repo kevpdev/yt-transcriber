@@ -1,3 +1,4 @@
+import os
 import tempfile
 import threading
 from contextlib import asynccontextmanager
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 
 from . import jobs as j
 from .audio import AudioError, download_audio
+from .fake import FakeTranscriber, fake_download
 from .transcribe import Transcriber
 from .urls import InvalidUrl, canonical_url, parse_video_id
 
@@ -73,4 +75,6 @@ def create_app(transcriber=None, download=download_audio) -> FastAPI:
 
 def build_app() -> FastAPI:
     # lancé par `uvicorn --factory app.main:build_app`, les tests importent sans GPU
+    if os.environ.get("YT_FAKE") == "1":
+        return create_app(FakeTranscriber(), fake_download)
     return create_app()

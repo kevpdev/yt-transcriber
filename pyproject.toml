@@ -9,6 +9,7 @@ include = ["app", "tests"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=app"
+testpaths = ["tests"]
 
 [tool.coverage.report]
 fail_under = 80
