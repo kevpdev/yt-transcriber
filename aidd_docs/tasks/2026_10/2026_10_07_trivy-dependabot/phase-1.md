@@ -67,11 +67,12 @@ journey
 1. In `aidd_docs/memory/deployment.md`, replace "No CI/CD" with a line saying there is no build or deploy pipeline, only a Trivy scan on pull requests and Dependabot updates.
 2. README has no CI line, nothing to change there.
 
-### `4)` Manual step for the user
+### `4)` Enable the repository settings
 
-> Not doable from the repo.
+> Done with `gh api`, no UI path needed.
 
-1. List for the user: enable Dependabot alerts and security updates in Settings > Code security. The exact UI path is not confirmed.
+1. `gh api -X PUT repos/kevpdev/yt-transcriber/vulnerability-alerts` then `gh api -X PUT repos/kevpdev/yt-transcriber/automated-security-fixes`.
+2. Check: the first returns 204, the second `{"enabled":true}`.
 
 ## Test acceptance criteria
 
