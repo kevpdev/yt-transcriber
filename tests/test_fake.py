@@ -1,5 +1,4 @@
 import time
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -54,9 +53,9 @@ def test_fake_job_goes_through_downloading_transcribing_done_in_order(monkeypatc
     assert seen == [j.DOWNLOADING, j.TRANSCRIBING, j.DONE]
 
 
-def test_fake_progress_goes_through_the_stages():
+def test_fake_progress_is_increasing_and_ends_at_one(tmp_path):
     seen = []
-    FakeTranscriber().run(fake_download(URL, Path("/tmp")), seen.append)
+    FakeTranscriber().run(fake_download(URL, tmp_path), seen.append)
     assert seen[-1] == 1.0 and seen == sorted(seen)
 
 
