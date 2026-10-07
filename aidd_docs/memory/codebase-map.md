@@ -13,7 +13,7 @@ flowchart TD
 ## Areas
 
 - `app/`: the backend. `main.py` wires the routes, `urls.py` validates the YouTube URL, `jobs.py` holds the job state, `audio.py` downloads, `transcribe.py` runs Whisper, `fake.py` holds the fake transcriber and downloader used when `YT_FAKE=1`.
-- `app/static/`: the single page, `index.html`.
+- `app/static/`: the page, served at `/` and `/static`. `index.html` holds the markup, the Tailwind directives and the theme script of the `<head>`, `theme.css` the theme variables, `app.js` the transcription and the theme button.
 - `tests/`: pytest suites for the job flow, the URL parsing and the fake mode, run by `scripts/check.sh`.
 - `e2e/`: Playwright scenarios for the page, run by `scripts/e2e.sh fake|real`, outside `scripts/check.sh`.
 - `aidd_docs/`: the AI memory, the decision records under `memory/internal/decisions/`, and the task plans.

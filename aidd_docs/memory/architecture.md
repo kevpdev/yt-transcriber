@@ -5,7 +5,7 @@ The macro technical shape: the stack, how the pieces fit, and the decisions behi
 ## Stack
 
 - Python and FastAPI for the backend, because faster-whisper is Python and a second runtime would need a bridge.
-- A single HTML page with vanilla JS and Tailwind through its Play CDN, served by FastAPI. No front build.
+- One page with vanilla JS and Tailwind through its Play CDN, split into `index.html`, `theme.css` and `app.js`, served by FastAPI from `/` and `/static`. No front build. See `internal/decisions/page-files.md`.
 - faster-whisper with the `large-v3-turbo` model in float16, called inside the API process.
 - yt-dlp with `deno` for the audio download. No ffmpeg, PyAV decodes the audio.
 - Docker Compose with an NVIDIA GPU reservation.
