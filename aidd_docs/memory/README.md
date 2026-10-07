@@ -31,6 +31,10 @@ Refreshed automatically by the memory hook. Do not edit by hand.
 - [project-brief.md](project-brief.md)
 - [testing.md](testing.md)
 - [vcs.md](vcs.md)
+
+Read on demand:
+
+- [internal/decisions/stack.md](internal/decisions/stack.md)
 <!-- files:end -->
 
 ## Maintaining it
