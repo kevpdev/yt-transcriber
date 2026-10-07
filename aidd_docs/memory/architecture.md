@@ -28,7 +28,7 @@ flowchart TD
 - One job at a time, because there is one GPU. The second request gets `409`.
 - Jobs live in memory only, the last 20 are kept, and a restart loses them.
 - No language select. Whisper detects the language and translation is left to the downstream skill.
-- yt-dlp is not pinned, so a `--no-cache` rebuild follows YouTube changes.
+- yt-dlp is locked in `uv.lock` and upgraded at build, so a `--no-cache` rebuild still follows YouTube changes.
 - A change that departs from the ADR needs a new ADR first.
 
 ## Gotchas
