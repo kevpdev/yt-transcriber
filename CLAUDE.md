@@ -55,6 +55,7 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 @aidd_docs/memory/vcs.md
 
 <!-- read on demand, not auto-loaded -->
+- aidd_docs/memory/internal/decisions/lockfile.md
 - aidd_docs/memory/internal/decisions/stack.md
 
 <!-- aidd_project_memory:end -->
