@@ -1,6 +1,6 @@
 ---
 objective: "The five page scenarios of the MVP review replay with one command, against a fake transcriber without GPU and against the real model."
-status: pending
+status: in-progress
 ---
 
 <!-- Fill or omit these sections; never add, rename, or reorder one. -->
