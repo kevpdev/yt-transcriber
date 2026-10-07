@@ -10,7 +10,7 @@
 
 ## Representation
 
-A Task is a GitHub issue. The title follows the commit convention: `type(scope): subject`, in English. The type lives only in the title, no type label duplicates it. The only label in use is `later`, for ideas kept in reserve.
+A Task is a GitHub issue. The title follows the commit convention: `type(scope): subject`, in English. The type lives only in the title, no type label duplicates it. The labels in use are `later`, for ideas kept in reserve, and `next`, for what is done first.
 
 | Task field | Issue body |
 | --- | --- |
@@ -32,7 +32,7 @@ Optional sections, only when they hold something: `## Fichiers à lire` (paths),
 
 ## Planning
 
-- Priority: none configured, the order follows the `Dépend de` links.
+- Priority: the label `next` marks what is done first, an issue with no label is normal, `later` is the reserve. Otherwise the order follows the `Dépend de` links, which say "blocked by" and not "more urgent".
 
 ## Relations
 
