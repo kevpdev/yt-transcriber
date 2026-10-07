@@ -1,7 +1,7 @@
 # Lockfile des dépendances Python et yt-dlp
 
 - Date: 2026-10-07
-- Status: Proposed
+- Status: Accepted
 - Supersedes: `aidd_docs/memory/internal/decisions/stack.md`, ligne « Audio » (`yt-dlp` non figé), une fois cet ADR accepté
 
 Prépare l'issue #25.
@@ -31,12 +31,16 @@ On passe à `uv`, avec `pyproject.toml` pour la déclaration et `uv.lock` pour l
 - **Laisser les `nvidia-*` dans le `Dockerfile`** : hors lockfile, donc hors scan.
 - **Mettre le lock à jour à la main** : il se périme sans alerte.
 
-## À vérifier avant d'accepter (supposé, non testé)
+## Vérifications faites le 2026-10-07
 
-- `uv sync --frozen` dans le `python:3.12-slim` du `Dockerfile`, avec le groupe `gpu`, produit la même image qu'aujourd'hui. La taille et le démarrage GPU ne sont pas mesurés.
-- Dependabot prend en charge `uv` et ouvre une PR sur `uv.lock`. Non lu dans sa doc.
-- Après `uv pip install --upgrade yt-dlp`, `uv.lock` et l'image divergent sur cette seule version. Le scan Trivy voit la version verrouillée, pas celle de l'image. À accepter, ou à corriger.
-- Le piège PyAV (`>=15,<16`) se déclare dans `pyproject.toml` et se retrouve dans le lock. Dependabot propose déjà `av>=19.0.1` dans la PR #24, qui casse faster-whisper d'après `stack.md`.
+- **Dependabot** gère l'écosystème `uv` pour les mises à jour de version (doc `supported-package-managers.md`). Pour les mises à jour de sécurité, la doc dépend d'un drapeau GitHub, non confirmé pour ce dépôt.
+- **Build** : `uv sync --frozen --no-install-project --group gpu` dans `python:3.12-slim` passe en 2 min, image de 4,79 Go contre 4,76 Go aujourd'hui.
+- **GPU** : dans cette image, `entrypoint.sh` trouve les libs `nvidia-*`, `ctranslate2` voit 1 GPU, et la vidéo `KnXm3PbNz5A` (15 min) est transcrite en 35 s, 3 680 mots, sans erreur. `stack.md` mesure 30 s avec l'image actuelle.
+- **PyAV** reste en `15.1.0` avec la borne `<16`. La PR #24 propose `av>=19.0.1`, qui casse faster-whisper d'après `stack.md`.
+
+## Risque accepté
+
+Après `uv pip install --upgrade yt-dlp`, l'image porte une version de `yt-dlp` plus récente que `uv.lock`, et Trivy scanne celle du lock. Le build ne fait que monter la version, donc Trivy voit au pire une version plus ancienne (un faux positif, pas une faille manquée). Ce raisonnement suppose qu'une version plus récente n'introduit pas de faille, il n'est pas mesuré. Dependabot sur `uv.lock` borne l'écart à une semaine.
 
 ## Conséquences
 
