@@ -12,6 +12,7 @@ The HTTP API surface: its style, the main resources, and the contracts.
 - `POST /jobs` takes `{"url": "..."}` and returns `202 {"id"}`. `422` for an invalid URL, `409` when a job is already running.
 - `GET /jobs/{id}` returns `{id, stage, progress, text, error}`. `404` for an unknown id.
 - `GET /` serves the page.
+- `GET /static/{file}` serves the CSS and JS of the page. `404 {"detail"}` for an unknown file.
 
 ## Contracts
 

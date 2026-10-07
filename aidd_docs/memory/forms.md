@@ -4,7 +4,7 @@ How forms are built and validated across the UI.
 
 ## Approach
 
-- One form, `#form` in `app/static/index.html`, with plain JS and no form or validation library.
+- One form, `#form` in `app/static/index.html`, with plain JS in `app/static/app.js` and no form or validation library.
 
 ## Conventions
 

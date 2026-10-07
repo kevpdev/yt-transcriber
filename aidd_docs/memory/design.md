@@ -4,14 +4,14 @@ The visual language: the design system, tokens, and UI conventions. What it look
 
 ## System
 
-- No design system. Styling is Tailwind utility classes written inline in `app/static/index.html`, loaded from the Play CDN.
+- No design system. Styling is Tailwind utility classes written inline in `app/static/index.html`, loaded from the Play CDN. The theme variables live in `app/static/theme.css`, the Tailwind directives (`@custom-variant`, `@theme inline`) stay in `index.html` because the CDN reads no external file for them.
 - Two themes, light and dark, in palette B (lagoon and coral). The page follows `prefers-color-scheme`, and the button in the header forces one of them. The choice is kept in `localStorage` under `yt-transcriber-theme`.
 - The `dark` class on `<html>` drives the `dark` variant (`@custom-variant`). A script in `<head>` sets it before first paint, so there is no flash.
 
 ## Tokens
 
-- Semantic colors as CSS variables per theme, exposed to Tailwind by `@theme inline`: `canvas`, `surface`, `line` (soft fill of the icon buttons), `border` (field outlines, at least 3:1 on canvas and surface), `ink`, `muted`, `action`, `on-action`, `action-hover`, `accent`, `danger`. No `slate-*`, `sky-*` or `red-*` class in the page.
-- The measured contrast ratios sit in a CSS comment above the variables. Text pairs are above 4.5, component pairs above 3, placeholders use `muted` on `surface`. The status line uses `action`. `accent` (coral) only colors the focus border of the URL field, because it is too close to `danger` in dark to carry a state. Recompute them before changing a color.
+- Semantic colors as CSS variables per theme (`theme.css`), exposed to Tailwind by `@theme inline`: `canvas`, `surface`, `line` (soft fill of the icon buttons), `border` (field outlines, at least 3:1 on canvas and surface), `ink`, `muted`, `action`, `on-action`, `action-hover`, `accent`, `danger`. No `slate-*`, `sky-*` or `red-*` class in the page.
+- The measured contrast ratios sit in a CSS comment above the variables in `theme.css`. Text pairs are above 4.5, component pairs above 3, placeholders use `muted` on `surface`. The status line uses `action`. `accent` (coral) only colors the focus border of the URL field, because it is too close to `danger` in dark to carry a state. Recompute them before changing a color.
 - Spacing is the Tailwind defaults, set where it is used.
 
 ## Accessibility
