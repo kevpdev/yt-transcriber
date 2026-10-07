@@ -4,3 +4,4 @@ faster-whisper==1.2.1
 av>=15,<16
 yt-dlp
 deno
+urllib3<1.26.5
