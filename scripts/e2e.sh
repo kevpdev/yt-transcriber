@@ -1,6 +1,7 @@
 #!/bin/sh
 # Tests de bout en bout de la page avec Playwright, sur le faux transcripteur ou sur le vrai modèle.
 #   scripts/e2e.sh fake   Docker seul, pas de GPU : l'appli tourne avec YT_FAKE=1.
+#   scripts/e2e.sh real   Docker et GPU : compose lance le vrai modèle, vidéo KnXm3PbNz5A.
 # Le conteneur Playwright partage le réseau de l'hôte pour joindre localhost:8000.
 set -e
 
@@ -39,8 +40,16 @@ case "$LEVEL" in
     wait_for_page
     run_suite
     ;;
+  real)
+    trap 'docker compose -f "$ROOT/compose.yaml" down >/dev/null 2>&1 || true' EXIT
+    docker compose -f "$ROOT/compose.yaml" up -d --build
+    # La page n'est servie qu'une fois le modèle chargé, le premier démarrage le télécharge.
+    wait_for_page 150
+    export E2E_VIDEO_URL=https://www.youtube.com/watch?v=KnXm3PbNz5A
+    run_suite
+    ;;
   *)
-    echo "usage: scripts/e2e.sh fake" >&2
+    echo "usage: scripts/e2e.sh fake|real" >&2
     exit 2
     ;;
 esac
