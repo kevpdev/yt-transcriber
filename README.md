@@ -38,7 +38,15 @@ yt-dlp n'est pas figé. Si YouTube change et que le téléchargement casse, reco
 ## Tests
 
 ```sh
-docker run --rm -v "$PWD":/src:ro -w /src python:3.12-slim sh -c "pip install -q -r requirements-dev.txt && python -m pytest -q -p no:cacheprovider"
+scripts/check.sh
+```
+
+Enchaîne `ruff format --check`, `ruff check`, `pyright`, puis `pytest` avec un seuil de couverture de 80 %, dans un conteneur `python:3.12-slim`, et s'arrête à la première étape en échec. `scripts/check.sh --fast` s'arrête après `pyright`.
+
+Pour que `git commit` lance les trois premières étapes sur le contenu indexé :
+
+```sh
+git config core.hooksPath scripts/hooks
 ```
 
 ## Mesure de référence

@@ -22,7 +22,6 @@
 - **Surgical changes:** ship the minimum that solves the problem; touch only what the task needs, and leave the code cleaner than you found it.
 - **Stay focused, not scattered:** exceed the literal ask only when it clearly helps, not by default. When you spot an unrelated issue, note it in one line and keep going; detour only if it blocks the task.
 - **Solve your own issues first:** genuinely try to resolve it yourself before escalating to the human.
-- **Do not commit or push** unless the user asks.
 - **Don't assume your knowledge is current.**
 - **Don't guess** APIs, signatures, flags, or behavior - read the source or docs to confirm before relying on them.
 - **Ambiguous or expensive task:** ask one sharp question to pin down scope before building, rather than guess.
@@ -53,6 +52,9 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 @aidd_docs/memory/project-brief.md
 @aidd_docs/memory/testing.md
 @aidd_docs/memory/vcs.md
+
+<!-- read on demand, not auto-loaded -->
+- aidd_docs/memory/internal/decisions/stack.md
 
 <!-- aidd_project_memory:end -->
 

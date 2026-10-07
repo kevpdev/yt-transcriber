@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Any
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -18,7 +19,7 @@ def download_audio(url: str, dest_dir: Path) -> Path:
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import DownloadError
 
-    opts = {
+    opts: Any = {
         "format": "bestaudio",
         "outtmpl": str(dest_dir / "%(id)s.%(ext)s"),
         "noplaylist": True,

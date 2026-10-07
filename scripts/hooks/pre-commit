@@ -1,0 +1,9 @@
+#!/bin/sh
+# Activation : git config core.hooksPath scripts/hooks
+# Contrôle le contenu indexé, pas l'arbre de travail : on exporte l'index dans un dossier jetable.
+set -e
+TOP=$(git rev-parse --show-toplevel)
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+git checkout-index -a --prefix="$TMP/"
+CHECK_ROOT="$TMP" "$TOP/scripts/check.sh" --fast

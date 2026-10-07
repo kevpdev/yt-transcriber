@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "BLE"]
+
+[tool.pyright]
+include = ["app", "tests"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=app"
+
+[tool.coverage.report]
+fail_under = 80

@@ -41,7 +41,7 @@ def create_app(transcriber=None, download=download_audio) -> FastAPI:
             store.finish(job, text)
         except AudioError as exc:
             store.fail(job, str(exc))
-        except Exception as exc:  # le job échoue, l'application continue
+        except Exception as exc:  # noqa: BLE001 - le job échoue, l'application continue
             store.fail(job, f"Erreur inattendue pendant la transcription : {exc}")
 
     @app.post("/jobs", status_code=202)
