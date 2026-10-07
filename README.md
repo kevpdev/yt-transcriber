@@ -28,7 +28,20 @@ La langue parlée est détectée automatiquement et le texte sort dans cette lan
 
 Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
 
-yt-dlp est verrouillé dans `uv.lock` puis mis à jour au build. Si YouTube change et que le téléchargement casse, reconstruis l'image : `docker compose build --no-cache`.
+## Dépendances
+
+Elles sont déclarées dans `pyproject.toml` et figées dans `uv.lock`. Dependabot propose les mises à jour chaque semaine, Trivy scanne le lock à chaque pull request.
+
+| Paquet | Rôle | À savoir |
+| --- | --- | --- |
+| `fastapi`, `uvicorn` | le serveur HTTP et la page | rien de particulier |
+| `faster-whisper` `1.2.1` | transcrit l'audio avec le modèle `large-v3-turbo` sur le GPU | version exacte |
+| `av` (PyAV) | décode le fichier audio `.webm` avant la transcription, sans installer `ffmpeg` | borné à `>=15,<16` : la version 19 casse faster-whisper (`metadata_errors`). Ne pas monter au-delà |
+| `yt-dlp` | télécharge la piste audio de la vidéo YouTube | verrouillé dans `uv.lock`, puis mis à jour au build. Si YouTube change et que le téléchargement casse, reconstruis l'image : `docker compose build --no-cache` |
+| `deno` | exécute le JavaScript dont `yt-dlp` a besoin | sans lui, YouTube cache des formats |
+| `nvidia-cublas-cu12`, `nvidia-cudnn-cu12` | bibliothèques CUDA appelées par le modèle | groupe `gpu` de `pyproject.toml`, `entrypoint.sh` règle `LD_LIBRARY_PATH` |
+
+Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/stack.md) pour la stack, [`lockfile.md`](aidd_docs/memory/internal/decisions/lockfile.md) pour le lockfile.
 
 ## API
 
