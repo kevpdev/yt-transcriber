@@ -1,6 +1,7 @@
-# ADR 0001 — Stack, modèle et exposition du GPU
+# Stack, modèle et exposition du GPU
 
-**Statut** : accepté, 2026-10-06.
+- Date: 2026-10-06
+- Status: Accepted
 
 ## Contexte
 

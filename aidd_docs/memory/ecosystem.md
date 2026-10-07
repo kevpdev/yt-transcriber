@@ -4,7 +4,7 @@
 flowchart TD
   Agent([Agent])
   App([App])
-  Vcs["GitHub · vcs.md"]
+  Vcs["GitHub · vcs.md · backlog.md"]
   YouTube["YouTube via yt-dlp · integration.md"]
   Hub["Hugging Face Hub · integration.md"]
   Cdn["jsDelivr CDN · integration.md"]

@@ -13,6 +13,16 @@ The version-control conventions this project follows: branches, commits, and the
 - Types in use: `feat`, `docs`
 - Work lands on `main` through a pull request, merged with a merge commit.
 
+## Pull request labels
+
+The branch prefix maps to an existing label. A prefix with no row gets no label.
+
+| Prefix | Label |
+| --- | --- |
+| `feat/` | `enhancement` |
+| `fix/`, `hotfix/` | `bug` |
+| `docs/` | `documentation` |
+
 ## Commits
 
 - Convention: conventional commits

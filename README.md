@@ -53,4 +53,4 @@ Vidéo publique de test : [`gsxiFd8AZQU`](https://www.youtube.com/watch?v=gsxiFd
 | Processus sur le GPU (`nvidia-smi`, pendant le run) | `python3.12` du conteneur, 2 080 MiB   |
 
 Modèle déjà en cache, RTX 5060 Ti 16 Go, 6 octobre 2026.
-Décisions de stack, modèle et mesures : [`docs/adr/0001-stack.md`](docs/adr/0001-stack.md).
+Décisions de stack, modèle et mesures : [`aidd_docs/memory/internal/decisions/stack.md`](aidd_docs/memory/internal/decisions/stack.md).

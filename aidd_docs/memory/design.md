@@ -5,8 +5,7 @@ The visual language: the design system, tokens, and UI conventions. What it look
 ## System
 
 - No design system. Styling is Tailwind utility classes written inline in `app/static/index.html`, loaded from the Play CDN.
-- Dark theme only: `slate` surfaces with a `sky` accent. A new design with a light and a dark theme is planned in `docs/ameliorations.md`.
-
+- Dark theme only: `slate` surfaces with a `sky` accent.
 ## Tokens
 
 - None. Colors and spacing are the Tailwind defaults, set where they are used.

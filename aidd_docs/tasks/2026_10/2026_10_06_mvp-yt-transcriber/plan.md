@@ -10,7 +10,7 @@ status: pending
 | Field      | Value                                                                       |
 | ---------- | --------------------------------------------------------------------------- |
 | **Goal**   | Application locale FastAPI + page vanilla, transcription faster-whisper GPU |
-| **Source** | `docs/adr/0001-stack.md` et la demande « Prompt 2 : implémentation du MVP » |
+| **Source** | `aidd_docs/memory/internal/decisions/stack.md` et la demande « Prompt 2 : implémentation du MVP » |
 
 ## Phases
 
@@ -24,7 +24,7 @@ status: pending
 
 | Source                                                       | Verified                                                                           |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `docs/adr/0001-stack.md`                                     | stack, réglages Whisper, pièges PyAV et `LD_LIBRARY_PATH`, réservation GPU Compose |
+| `aidd_docs/memory/internal/decisions/stack.md`                                     | stack, réglages Whisper, pièges PyAV et `LD_LIBRARY_PATH`, réservation GPU Compose |
 | https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4          | Play CDN Tailwind v4 cité par l'ADR                                                |
 
 ## Decisions

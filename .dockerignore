@@ -3,5 +3,4 @@
 __pycache__
 .pytest_cache
 aidd_docs
-docs
 tests

@@ -4,21 +4,37 @@
 
 | Support | Authority for | Role |
 | --- | --- | --- |
-| `docs/ameliorations.md` | planned improvements after the MVP | the backlog, one entry per topic |
-| `aidd_docs/tasks/` | the plan and phases of a delivered change | one folder per run, `plan.md` plus `phase-N.md` |
+| GitHub Issues | every Task of the backlog | the backlog, independent of branches |
+| `aidd_docs/tasks/` | the plan and phases of one delivery run | `plan.md` plus `phase-N.md` per run |
+| GitHub Issues, label `later` | ideas kept in reserve | same support, not scheduled, closed or deleted when dropped |
 
 ## Representation
 
-| Artifact | Support | Native representation |
+A Task is a GitHub issue. The title follows the commit convention: `type(scope): subject`, in English. The type lives only in the title, no type label duplicates it. The only label in use is `later`, for ideas kept in reserve.
+
+| Task field | Issue body |
+| --- | --- |
+| Outcome | `## Objectif`, one verifiable result |
+| Scope | `## Périmètre`, one `Inclus` line and one `Exclus` line |
+| Done When | `## Terminé quand`, observable checkboxes, each one naming the exact command or observation that proves it |
+| Relations | `## Dépend de`, issue numbers, or `rien` |
+| Completion Evidence | a comment posted when the issue closes |
+| Cancellation | the issue closed with the reason in a comment |
+
+Optional sections, only when they hold something: `## Fichiers à lire` (paths), `## Décisions déjà prises` (a pointer to the ADR), `## À trancher`.
+
+## Workflow
+
+| Support | Native status | Meaning |
 | --- | --- | --- |
-| Improvement | `docs/ameliorations.md` | a numbered `###` entry with objective, reason and principle |
-| Plan | `aidd_docs/tasks/` | `<yyyy_mm>/<yyyy_mm_dd>_<slug>/plan.md` |
-| Phase | `aidd_docs/tasks/` | `phase-N.md` beside its plan |
+| GitHub Issues | open | proposed or in progress |
+| GitHub Issues | closed | done, or cancelled with a comment saying so |
 
 ## Planning
 
-- Priority: the order of the entries in `docs/ameliorations.md`, which is the order they are meant to be done.
+- Priority: none configured, the order follows the `Dépend de` links.
 
 ## Relations
 
-- Dependency: an improvement that departs from `docs/adr/0001-stack.md` needs a new ADR before it starts.
+- Dependency: written in the body of the issue that depends on another, never copied elsewhere.
+- Decision: an issue that departs from `aidd_docs/memory/internal/decisions/stack.md` needs a new ADR before it starts.
