@@ -26,6 +26,7 @@ gpu = [
 
 [tool.uv]
 package = false
+constraint-dependencies = ["certifi==2022.12.7"]
 
 [tool.ruff]
 line-length = 100
