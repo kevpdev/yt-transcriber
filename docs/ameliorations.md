@@ -64,23 +64,67 @@ Ma préférence est la A : le vert d'eau tranche avec le bleu actuel, et l'ambre
 - Coller avec `Shift+Insert` : mesuré pendant le MVP, `Ctrl+V` ne colle rien dans Chromium headless.
 - Rangement et lanceur (dossier `tests/e2e/`, service Compose dédié ou commande `docker run`) à trancher à l'implémentation, avec `pytest-playwright` ou le script brut (supposé : les deux conviennent).
 
+### 4. Chaîne de contrôles déterministes avant les tests
+
+**Objectif** : contrôler un changement avec une seule commande rejouable, qui enchaîne les étapes du plus déterministe au plus lent et s'arrête à la première qui échoue.
+
+**Pourquoi** : le dépôt n'a que pytest. `aidd_docs/memory/coding-assertions.md`, que lisent les skills AIDD, n'a donc rien d'autre à exécuter, et une erreur de style ou de type ne se voit qu'à la relecture.
+
+**Principe** : un script `scripts/check.sh`, lancé dans un conteneur comme les tests actuels, pour ne rien installer sur la machine. Les mêmes commandes alimentent `coding-assertions.md` : les étapes 1 à 3 avant le commit, les étapes 4 et 5 avant le push.
+
+| Ordre | Étape | Outil |
+|---|---|---|
+| 1 | format, en vérification seule | `ruff format --check` |
+| 2 | lint | `ruff check` |
+| 3 | typecheck | `pyright` |
+| 4 | tests unitaires et API, avec un seuil de couverture | `pytest` |
+| 5 | e2e | Playwright, voir le n° 3 |
+
+**À livrer dans la même issue** : la config `ruff` et la correction de ce qu'elle relève sur le code actuel, `pyright` en dépendance de dev, le script `scripts/check.sh`, la mise à jour de `coding-assertions.md`, le seuil de couverture. Le hook pre-commit local et le branchement sur la CI (n° 10) peuvent venir après.
+
+**À trancher à l'implémentation**
+- `pyright` ou `mypy`. `ruff` couvre le format et le lint avec un seul outil, ce choix-là est fait.
+- Le jeu de règles `ruff` et la valeur du seuil de couverture, à mesurer sur le code actuel.
+- La config dans `pyproject.toml` ou dans des fichiers séparés.
+- Le comportement du typecheck avec `faster_whisper` et `yt_dlp` (supposé : pas de stubs complets, non mesuré).
+
+### 5. Recherche de code par graphe avec CodeGraph
+
+**Objectif** : donner à l'agent un graphe local des symboles, des appels et des dépendances du dépôt, pour qu'il interroge le graphe au lieu d'enchaîner `grep` et lectures de fichiers.
+
+**Pourquoi** : `grep` ne suit pas les appels indirects ni l'impact d'un changement. Le README de [CodeGraph](https://github.com/colbymchenry/codegraph) annonce 88 % d'appels d'outils en moins sur sept dépôts de 110 à 11 000 fichiers. Ce dépôt-ci compte 7 fichiers Python, le gain n'y est pas prouvé.
+
+**Principe** : trois commandes, dans cet ordre.
+1. Installer la CLI avec le script du dépôt CodeGraph, qui n'exige pas Node.
+2. `codegraph install`, qui branche le serveur MCP sur Claude Code et ajoute une section balisée dans `CLAUDE.md`.
+3. `codegraph init` dans ce dépôt, qui crée `.codegraph/` et construit le graphe. La synchronisation se fait ensuite toute seule.
+
+**À respecter**
+- Couper la télémétrie anonyme : `codegraph telemetry off`, ou `DO_NOT_TRACK=1`.
+- Retirer l'installation si elle ne sert pas : `codegraph uninstall`, puis `codegraph uninit` pour le dépôt.
+
+**À trancher à l'implémentation**
+- Mesurer d'abord l'intérêt sur ce dépôt : une même question d'architecture, avec et sans le graphe, en comparant appels d'outils et tokens.
+- Ignorer `.codegraph/` dans `.gitignore` ou le versionner (supposé : à ignorer, non vérifié dans la doc).
+- La config MCP s'écrit-elle dans `~/.claude` ou dans le dépôt (supposé : globale, non vérifié).
+
 ## Suggestions
 
 Classées par intérêt, du plus rentable au plus lointain.
 
 | # | Suggestion | Pourquoi |
 |---|---|---|
-| 4 | **Limite de durée sur un job** et refus des directs en cours (`/live/ID`) | relevé par la revue du MVP : un direct sans fin garderait le verrou pris jusqu'au redémarrage du conteneur (supposé, non mesuré) |
-| 5 | **Titre, chaîne et durée de la vidéo** affichés dès le lancement | on vérifie qu'on a collé la bonne vidéo avant d'attendre plusieurs minutes |
-| 6 | **Télécharger le texte en `.txt`**, avec le titre de la vidéo en première ligne | le texte part ensuite vers le skill de résumé, le titre lui sert de contexte |
-| 7 | **Annuler un job en cours** | aujourd'hui un mauvais collage bloque le GPU jusqu'à la fin, et un second job reçoit un 409 |
-| 8 | **CI GitHub Actions**, sans GPU : les 23 tests pytest et l'e2e Playwright avec transcripteur factice | le dépôt n'en a pas, la PR #1 a été validée à la main. Les runners GitHub standard n'ont pas de GPU (supposé, à vérifier dans la doc), donc le modèle réel reste testé en local avant fusion. Un runner auto-hébergé sur ta machine pourrait le lancer, mais sur un dépôt public il exécuterait le code des PR, à ne considérer que dépôt privé |
-| 9 | **Healthcheck Compose** sur la fin du chargement du modèle | le premier démarrage télécharge 1,6 Go et la page n'est servie qu'après |
-| 10 | **Hotwords modifiables depuis la page** | aujourd'hui il faut relancer le conteneur avec `HOTWORDS` |
-| 11 | **Mesurer l'anglais** sur 2 ou 3 vidéos, avec un jeu de référence | l'ADR note la qualité en anglais comme supposée, non mesurée |
-| 12 | **File d'attente de plusieurs URLs** | un seul GPU, donc traitement l'un après l'autre |
-| 13 | **Brancher le skill de résumé** | hors MVP par décision, à reprendre une fois le texte et la télémétrie stables |
-| 14 | **Traduction en aval** avec un petit modèle local | prévue comme étape ultérieure par l'ADR, `large-v3-turbo` ne traduit pas |
+| 6 | **Limite de durée sur un job** et refus des directs en cours (`/live/ID`) | relevé par la revue du MVP : un direct sans fin garderait le verrou pris jusqu'au redémarrage du conteneur (supposé, non mesuré) |
+| 7 | **Titre, chaîne et durée de la vidéo** affichés dès le lancement | on vérifie qu'on a collé la bonne vidéo avant d'attendre plusieurs minutes |
+| 8 | **Télécharger le texte en `.txt`**, avec le titre de la vidéo en première ligne | le texte part ensuite vers le skill de résumé, le titre lui sert de contexte |
+| 9 | **Annuler un job en cours** | aujourd'hui un mauvais collage bloque le GPU jusqu'à la fin, et un second job reçoit un 409 |
+| 10 | **CI GitHub Actions**, sans GPU : `scripts/check.sh` du n° 4 (format, lint, typecheck, les 23 tests pytest) et l'e2e Playwright avec transcripteur factice | le dépôt n'en a pas, la PR #1 a été validée à la main. Les runners GitHub standard n'ont pas de GPU (supposé, à vérifier dans la doc), donc le modèle réel reste testé en local avant fusion. Un runner auto-hébergé sur ta machine pourrait le lancer, mais sur un dépôt public il exécuterait le code des PR, à ne considérer que dépôt privé |
+| 11 | **Healthcheck Compose** sur la fin du chargement du modèle | le premier démarrage télécharge 1,6 Go et la page n'est servie qu'après |
+| 12 | **Hotwords modifiables depuis la page** | aujourd'hui il faut relancer le conteneur avec `HOTWORDS` |
+| 13 | **Mesurer l'anglais** sur 2 ou 3 vidéos, avec un jeu de référence | l'ADR note la qualité en anglais comme supposée, non mesurée |
+| 14 | **File d'attente de plusieurs URLs** | un seul GPU, donc traitement l'un après l'autre |
+| 15 | **Brancher le skill de résumé** | hors MVP par décision, à reprendre une fois le texte et la télémétrie stables |
+| 16 | **Traduction en aval** avec un petit modèle local | prévue comme étape ultérieure par l'ADR, `large-v3-turbo` ne traduit pas |
 
 ## Points ouverts du MVP
 
