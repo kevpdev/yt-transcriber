@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 <!-- Fill or omit these sections; never add, rename, or reorder one. -->
@@ -12,6 +12,7 @@ status: pending
 
 ```txt
 .
+├── pyproject.toml         ✏️ pytest testpaths = ["tests"]
 ├── e2e/
 │   ├── conftest.py        ✅ base URL, video URL, browser context options
 │   ├── requirements.txt   ✅ pytest, pytest-playwright
@@ -87,4 +88,4 @@ journey
 | ---- | ----------------------------------------------------------------------------------------------------------- |
 | 1    | Each of the five scenarios fails when its page behavior is broken, checked by one deliberate break per test |
 | 2    | `scripts/e2e.sh fake` passes on a machine without GPU access and leaves no container behind                 |
-| 2    | `scripts/check.sh` is unchanged and still passes, `e2e/` is outside its scope                               |
+| 2    | `scripts/check.sh` script is unchanged and still passes, `pyproject.toml` gets `testpaths = ["tests"]` so `e2e/` is outside its scope |
