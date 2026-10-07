@@ -73,11 +73,14 @@ def test_unknown_job_is_cleared(page, base_url):
     expect(page.locator("#go")).to_be_enabled()
 
 
-def test_copy_puts_the_whole_text_in_the_clipboard(page, base_url, video_url):
+def test_copy_puts_the_whole_text_in_the_clipboard(page, base_url, video_url, e2e_level):
     submit(page, base_url, video_url)
     expect(page.locator("#status")).to_have_text("Terminé.", timeout=DONE_TIMEOUT)
     text = page.input_value("#out")
     assert text
+    # Le niveau real ne doit jamais tourner sur le faux transcripteur, ni l'inverse.
+    if e2e_level:
+        assert ("transcription factice" in text) == (e2e_level == "fake")
     page.click("#copy")
     expect(page.locator("#status")).to_have_text("Texte copié dans le presse-papiers.")
     page.fill("#url", "")

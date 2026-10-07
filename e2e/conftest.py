@@ -14,6 +14,12 @@ def video_url():
 
 
 @pytest.fixture(scope="session")
+def e2e_level():
+    # fake ou real, posé par scripts/e2e.sh. Vide : le niveau n'est pas contrôlé.
+    return os.environ.get("E2E_LEVEL", "")
+
+
+@pytest.fixture(scope="session")
 def browser_type_launch_args(browser_type_launch_args):
     # Chromium tourne en root dans le conteneur.
     return {**browser_type_launch_args, "args": ["--no-sandbox"]}
