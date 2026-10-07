@@ -1,0 +1,45 @@
+/* Palette B (lagoon and coral), WCAG contrast ratios measured on 2026-10-07,
+   with the exact color-mix results. Text needs 4.5, components 3.
+   Light: text 16.79 on canvas, 17.79 on surface
+          muted 5.98 on canvas, 6.33 on surface (placeholders sit on surface)
+          white on action 4.82, white on hovered action 5.7
+          accent 4.87 on canvas, danger 6.10 on canvas
+          action 4.55 on canvas (component, and the status line text)
+          field border 3.41 on canvas, 3.61 on surface
+          text on line 12.07 (copy and theme icons)
+   Dark:  text 16.79 on canvas, 14.91 on surface
+          muted 8.24 on canvas, 7.31 on surface
+          dark text on action 4.83, dark text on hovered action 5.6
+          accent 6.61 on canvas, danger 6.43 on canvas
+          action 4.83 on canvas (component, and the status line text)
+          field border 4.09 on canvas, 3.63 on surface
+          text on line 11.35 (copy and theme icons)
+   Accent (coral) only colors the focus border of the URL field. It stays out of the
+   status line because it is too close to danger in dark (1.03 between them).
+   --line is the soft fill of the icon buttons, --border outlines the fields. */
+:root {
+  color-scheme: light;
+  --canvas: #FAF8F5;
+  --surface: #FFFFFF;
+  --line: #D9D4CC;
+  --border: #8C867C;
+  --ink: #14181F;
+  --muted: color-mix(in srgb, var(--canvas) 32%, var(--ink) 68%);
+  --action: #0C7C99;
+  --on-action: #FFFFFF;
+  --action-hover: color-mix(in srgb, var(--action) 88%, var(--ink) 12%);
+  --accent: #D6193F;
+  --danger: #B91C1C;
+}
+html.dark {
+  color-scheme: dark;
+  --canvas: #14181F;
+  --surface: #1D232C;
+  --line: #2E3744;
+  --border: #6E7A8C;
+  --ink: #FAF8F5;
+  --action: #0891B2;
+  --on-action: #14181F;
+  --accent: #FB7185;
+  --danger: #F87171;
+}

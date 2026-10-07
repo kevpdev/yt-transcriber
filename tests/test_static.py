@@ -25,3 +25,8 @@ def test_unknown_static_file_gives_404_without_stack_trace():
     assert resp.status_code == 404
     assert "Traceback" not in resp.text
 
+
+def test_index_route_still_serves_the_page():
+    resp = make_client().get("/")
+    assert resp.status_code == 200
+    assert "/static/app.js" in resp.text

@@ -6,7 +6,7 @@
   <title>yt-transcriber</title>
   <script>
     // Runs before first paint to avoid a flash: a saved choice wins, else the system theme.
-    // The key and the media query are defined here once, the toggle script at the end of body reuses them.
+    // The key and the media query are defined here once, /static/app.js reuses them.
     var THEME_KEY = "yt-transcriber-theme";
     var systemDark = window.matchMedia("(prefers-color-scheme: dark)");
     (function () {
@@ -16,55 +16,11 @@
       document.documentElement.classList.toggle("dark", dark);
     })();
   </script>
+  <link rel="stylesheet" href="/static/theme.css">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
     @custom-variant dark (&:where(.dark, .dark *));
 
-    /* Palette B (lagoon and coral), WCAG contrast ratios measured on 2026-10-07,
-       with the exact color-mix results. Text needs 4.5, components 3.
-       Light: text 16.79 on canvas, 17.79 on surface
-              muted 5.98 on canvas, 6.33 on surface (placeholders sit on surface)
-              white on action 4.82, white on hovered action 5.7
-              accent 4.87 on canvas, danger 6.10 on canvas
-              action 4.55 on canvas (component, and the status line text)
-              field border 3.41 on canvas, 3.61 on surface
-              text on line 12.07 (copy and theme icons)
-       Dark:  text 16.79 on canvas, 14.91 on surface
-              muted 8.24 on canvas, 7.31 on surface
-              dark text on action 4.83, dark text on hovered action 5.6
-              accent 6.61 on canvas, danger 6.43 on canvas
-              action 4.83 on canvas (component, and the status line text)
-              field border 4.09 on canvas, 3.63 on surface
-              text on line 11.35 (copy and theme icons)
-       Accent (coral) only colors the focus border of the URL field. It stays out of the
-       status line because it is too close to danger in dark (1.03 between them).
-       --line is the soft fill of the icon buttons, --border outlines the fields. */
-    :root {
-      color-scheme: light;
-      --canvas: #FAF8F5;
-      --surface: #FFFFFF;
-      --line: #D9D4CC;
-      --border: #8C867C;
-      --ink: #14181F;
-      --muted: color-mix(in srgb, var(--canvas) 32%, var(--ink) 68%);
-      --action: #0C7C99;
-      --on-action: #FFFFFF;
-      --action-hover: color-mix(in srgb, var(--action) 88%, var(--ink) 12%);
-      --accent: #D6193F;
-      --danger: #B91C1C;
-    }
-    html.dark {
-      color-scheme: dark;
-      --canvas: #14181F;
-      --surface: #1D232C;
-      --line: #2E3744;
-      --border: #6E7A8C;
-      --ink: #FAF8F5;
-      --action: #0891B2;
-      --on-action: #14181F;
-      --accent: #FB7185;
-      --danger: #F87171;
-    }
     @theme inline {
       --color-canvas: var(--canvas);
       --color-surface: var(--surface);
@@ -118,134 +74,6 @@
       </button>
     </div>
   </main>
-
-  <script>
-    (function () {
-      const root = document.documentElement;
-      const button = document.getElementById("theme");
-      const sync = () => button.setAttribute("aria-pressed", String(root.classList.contains("dark")));
-      const hasChoice = () => { try { return localStorage.getItem(THEME_KEY) !== null; } catch { return false; } };
-      sync();
-      button.addEventListener("click", () => {
-        const dark = !root.classList.contains("dark");
-        root.classList.toggle("dark", dark);
-        try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch {}
-        sync();
-      });
-      systemDark.addEventListener("change", (ev) => {
-        if (hasChoice()) return;
-        root.classList.toggle("dark", ev.matches);
-        sync();
-      });
-    })();
-  </script>
-
-  <script>
-    const $ = (id) => document.getElementById(id);
-    const STAGES = { queued: "En attente", downloading: "Téléchargement de l'audio", transcribing: "Transcription" };
-    let timer = null;
-
-    function setBusy(busy) { $("go").disabled = busy; }
-    function showError(msg) { $("error").textContent = msg || ""; }
-
-    async function readError(resp) {
-      try { return (await resp.json()).detail || resp.statusText; } catch { return resp.statusText; }
-    }
-
-    const KEY = "yt-transcriber-job";
-    const MAX_RETRIES = 5;
-
-    function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY); } catch {} }
-    function remembered() { try { return localStorage.getItem(KEY); } catch { return null; } }
-
-    function stop(message) {
-      remember(null);
-      if (message) showError(message);
-      setBusy(false);
-    }
-
-    async function poll(id, failures = 0) {
-      let job;
-      try {
-        const resp = await fetch(`/jobs/${id}`);
-        if (resp.status === 404) {
-          $("status").textContent = "";
-          return stop("Ce job n'existe plus, le serveur a sûrement redémarré. Relance la transcription.");
-        }
-        if (!resp.ok) throw new Error(await readError(resp));
-        job = await resp.json();
-      } catch (e) {
-        if (failures + 1 >= MAX_RETRIES) {
-          $("status").textContent = "";
-          showError("Le serveur ne répond pas : " + e.message + ". Recharge la page pour reprendre le job.");
-          return setBusy(false);
-        }
-        $("status").textContent = "Connexion perdue, nouvelle tentative…";
-        timer = setTimeout(() => poll(id, failures + 1), 2000);
-        return;
-      }
-      showError("");
-      if (job.stage === "done") {
-        $("out").value = job.text;
-        $("status").textContent = "Terminé.";
-        return stop();
-      }
-      if (job.stage === "error") {
-        $("status").textContent = "";
-        return stop(job.error);
-      }
-      const pct = job.stage === "transcribing" ? ` · ${Math.round(job.progress * 100)} %` : "";
-      $("status").textContent = (STAGES[job.stage] || job.stage) + pct;
-      timer = setTimeout(() => poll(id), 2000);
-    }
-
-    $("form").addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      clearTimeout(timer);
-      showError("");
-      $("out").value = "";
-      setBusy(true);
-      try {
-        const resp = await fetch("/jobs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: $("url").value }),
-        });
-        if (!resp.ok) {
-          showError(await readError(resp));
-          setBusy(false);
-          return;
-        }
-        $("status").textContent = "En attente";
-        const { id } = await resp.json();
-        remember(id);
-        poll(id);
-      } catch (e) {
-        showError("Le serveur ne répond pas : " + e.message);
-        setBusy(false);
-      }
-    });
-
-    const resumed = remembered();
-    if (resumed) {
-      setBusy(true);
-      $("status").textContent = "Reprise du job en cours…";
-      poll(resumed);
-    }
-
-    $("copy").addEventListener("click", async () => {
-      const text = $("out").value;
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        $("out").select();
-        document.execCommand("copy");
-      }
-      $("copy").title = "Copié";
-      $("status").textContent = "Texte copié dans le presse-papiers.";
-      setTimeout(() => { $("copy").title = "Copier"; }, 1500);
-    });
-  </script>
+  <script src="/static/app.js" defer></script>
 </body>
 </html>
