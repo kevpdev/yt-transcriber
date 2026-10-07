@@ -1,10 +1,12 @@
 FROM python:3.12-slim
 
 WORKDIR /srv
-COPY requirements.txt .
-# yt-dlp n'est pas figé : une reconstruction --no-cache suit les changements de YouTube.
-RUN pip install --no-cache-dir -r requirements.txt \
-    nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"
+RUN pip install --no-cache-dir uv==0.12.23
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
+COPY pyproject.toml uv.lock ./
+# yt-dlp est verrouillé dans uv.lock puis mis à jour au build : une reconstruction --no-cache suit les changements de YouTube.
+RUN uv sync --frozen --no-install-project --no-dev --group gpu \
+    && uv pip install --upgrade yt-dlp
 
 COPY app app
 COPY entrypoint.sh .

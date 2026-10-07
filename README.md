@@ -28,7 +28,7 @@ La langue parlée est détectée automatiquement et le texte sort dans cette lan
 
 Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
 
-yt-dlp n'est pas figé. Si YouTube change et que le téléchargement casse, reconstruis l'image : `docker compose build --no-cache`.
+yt-dlp est verrouillé dans `uv.lock` puis mis à jour au build. Si YouTube change et que le téléchargement casse, reconstruis l'image : `docker compose build --no-cache`.
 
 ## API
 

@@ -2,7 +2,7 @@
 
 - Date: 2026-10-06
 - Status: Accepted
-- Superseded by (partiel): `aidd_docs/memory/internal/decisions/lockfile.md`, ligne « Audio » (`yt-dlp` non figé), à l'implémentation de #25
+- Superseded by (partiel): `aidd_docs/memory/internal/decisions/lockfile.md`, ligne « Audio » (`yt-dlp` non figé)
 
 ## Contexte
 
@@ -21,7 +21,7 @@ La machine cible est une RTX 5060 Ti de 16 Go, en compute capability 12.0 (Black
 | Transcription | faster-whisper `1.2.1`, modèle `large-v3-turbo`, `compute_type="float16"`, appelé dans le processus de l'API, modèle chargé une fois au démarrage | `large-v3` : 3 fois plus lent, sans gain mesuré sur le vocabulaire tech. `int8_float16` : économise une VRAM dont on n'a pas besoin |
 | Réglages | `language=None` (détection automatique), `beam_size=5`, `vad_filter=True`, `condition_on_previous_text=False`. `hotwords` reçoit une liste de termes tech lue dans une variable d'environnement, dont la valeur par défaut contient au moins « Claude Code, Claude, Anthropic, MCP » | sans hotwords, le modèle écrit « Cloud Code » 63 fois sur la vidéo de 56 min |
 | Langue | **pas de select.** Whisper détecte la langue parlée sur les premières secondes, et le texte sort dans cette langue, sans traduction. La traduction éventuelle se fait en aval, par le skill du vault. Un petit modèle local de traduction est une étape ultérieure, hors de ce MVP | un select de langue : sans traduction, il ne ferait que forcer une langue que la détection trouve seule. Traduire dans l'app : Whisper ne traduit que vers l'anglais, et `large-v3-turbo` ne traduit pas du tout (README OpenAI : « *the `turbo` model is not trained for translation tasks* »). Il faudrait un second modèle Whisper, plus un modèle de traduction pour aller de l'anglais vers le français |
-| Audio | `yt-dlp` récent, installé au build sans version figée, avec `deno` (paquet pip) comme runtime JS. Format `-f bestaudio`. Pas de ffmpeg, PyAV décode le `.webm` | interroger d'abord les sous-titres YouTube : les deux échantillons n'ont que des sous-titres automatiques, et ils ratent eux aussi « Claude Code » |
+| Audio | `yt-dlp` verrouillé dans `uv.lock` puis mis à jour au build (voir `lockfile.md`), avec `deno` (paquet pip) comme runtime JS. Format `-f bestaudio`. Pas de ffmpeg, PyAV décode le `.webm` | interroger d'abord les sous-titres YouTube : les deux échantillons n'ont que des sous-titres automatiques, et ils ratent eux aussi « Claude Code » |
 | Exposition du GPU | Docker, un seul service Compose, avec la réservation `deploy.resources.reservations.devices` (`driver: nvidia`, `count: all`, `capabilities: [gpu]`) | en natif : il faudrait `sudo apt install python3.12-venv`, absent de la machine |
 | Image | `python:3.12-slim`, plus les paquets pip `nvidia-cublas-cu12` et `nvidia-cudnn-cu12==9.*` | `nvidia/cuda` : plus lourde, et non mesurée |
 | Lancement | `docker compose up --build`, page sur `localhost:8000`, volume nommé pour `HF_HOME` (le modèle pèse 1,6 Go, téléchargé au premier démarrage) | `docker build` puis `docker run --gpus all …` : deux commandes |
@@ -62,4 +62,4 @@ Conteneur `python:3.12-slim` avec GPU, deux vidéos en français : `KnXm3PbNz5A`
 - Un seul runtime, Python, et une seule commande de lancement.
 - Pas de build front.
 - L'outil dépend d'internet pour joindre YouTube et le CDN Tailwind.
-- yt-dlp non figé : une reconstruction de l'image (`docker compose build --no-cache`) suffit à suivre les changements de YouTube.
+- yt-dlp verrouillé puis mis à jour au build (voir `lockfile.md`) : une reconstruction de l'image (`docker compose build --no-cache`) suffit à suivre les changements de YouTube.
