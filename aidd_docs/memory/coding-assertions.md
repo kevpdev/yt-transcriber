@@ -25,3 +25,8 @@ The tools run in a `python:3.12-slim` container on a copy of the repo, `scripts/
 ## Behavior
 
 If a fix is needed, spawn 1 agent per assertion to fix.
+
+## Language
+
+- Code, comments, docstrings, test names and scripts are in English. Documentation (`README.md`, `aidd_docs/`) may be in French.
+- User-facing text stays in French: API error messages, page strings, and the fake transcript. Tests that assert those strings keep them as they are.

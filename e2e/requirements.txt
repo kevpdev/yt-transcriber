@@ -1,3 +1,3 @@
-# Versions liées à l'image mcr.microsoft.com/playwright/python:v1.63.0-noble (voir scripts/e2e.sh).
+# Versions tied to the image mcr.microsoft.com/playwright/python:v1.63.0-noble (see scripts/e2e.sh).
 pytest-playwright==0.9.0
 playwright==1.63.0

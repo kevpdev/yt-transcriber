@@ -14,7 +14,7 @@ _KEEP = 20
 
 
 class JobBusy(Exception):
-    """Un job est déjà en cours, il n'y a qu'un GPU."""
+    """A job is already running, there is only one GPU."""
 
 
 @dataclass

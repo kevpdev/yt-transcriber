@@ -21,7 +21,7 @@ class Transcriber:
 
     def run(self, audio: Path, on_progress: Callable[[float], None]) -> str:
         if self.model is None:
-            raise RuntimeError("Le modèle n'est pas chargé, appeler load() d'abord.")
+            raise RuntimeError("The model is not loaded, call load() first.")
         segments, info = self.model.transcribe(
             str(audio),
             language=None,
