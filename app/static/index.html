@@ -17,18 +17,29 @@
   <style type="text/tailwindcss">
     @custom-variant dark (&:where(.dark, .dark *));
 
-    /* Palette B (lagoon and coral), WCAG contrast ratios measured on 2026-10-07.
-       Light: text 16.79 on canvas, muted 5.95 on canvas, white on action 4.82,
-              accent 4.87 on canvas, danger 6.10 on canvas.
-       Dark:  text 16.79 on canvas, muted 8.21 on canvas, dark text on action 4.83,
-              accent 6.61 on canvas, danger 6.43 on canvas.
-       Action also reads as a component against the canvas: 4.55 (light), 4.83 (dark).
-       Every text pair is above 4.5, every component pair above 3. */
+    /* Palette B (lagoon and coral), WCAG contrast ratios measured on 2026-10-07,
+       with the exact color-mix results. Text needs 4.5, components 3.
+       Light: text 16.79 on canvas, 17.79 on surface
+              muted 5.98 on canvas, 6.33 on surface (placeholders sit on surface)
+              white on action 4.82, white on hovered action 5.7
+              accent 4.87 on canvas, danger 6.10 on canvas
+              action 4.55 on canvas (component)
+              field border 3.41 on canvas, 3.61 on surface
+              text on line 12.07 (copy and theme icons)
+       Dark:  text 16.79 on canvas, 14.91 on surface
+              muted 8.24 on canvas, 7.31 on surface
+              dark text on action 4.83, dark text on hovered action 5.6
+              accent 6.61 on canvas, danger 6.43 on canvas
+              action 4.83 on canvas (component)
+              field border 4.09 on canvas, 3.63 on surface
+              text on line 11.35 (copy and theme icons)
+       --line is the soft fill of the icon buttons, --border outlines the fields. */
     :root {
       color-scheme: light;
       --canvas: #FAF8F5;
       --surface: #FFFFFF;
       --line: #D9D4CC;
+      --border: #8C867C;
       --ink: #14181F;
       --muted: color-mix(in srgb, var(--canvas) 32%, var(--ink) 68%);
       --action: #0C7C99;
@@ -42,6 +53,7 @@
       --canvas: #14181F;
       --surface: #1D232C;
       --line: #2E3744;
+      --border: #6E7A8C;
       --ink: #FAF8F5;
       --action: #0891B2;
       --on-action: #14181F;
@@ -52,6 +64,7 @@
       --color-canvas: var(--canvas);
       --color-surface: var(--surface);
       --color-line: var(--line);
+      --color-border: var(--border);
       --color-ink: var(--ink);
       --color-muted: var(--muted);
       --color-action: var(--action);
@@ -66,7 +79,7 @@
   <main class="mx-auto max-w-4xl px-4 py-10">
     <header class="mb-6 flex items-center justify-between">
       <h1 class="text-2xl font-semibold">yt-transcriber</h1>
-      <button id="theme" type="button" aria-label="Basculer entre thème clair et sombre" aria-pressed="false"
+      <button id="theme" type="button" aria-label="Thème sombre" aria-pressed="false"
               class="rounded-md bg-line p-2 hover:bg-action-hover hover:text-on-action">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
@@ -77,19 +90,19 @@
 
     <form id="form" class="flex gap-2">
       <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"
-             class="flex-1 rounded-lg bg-surface border border-line px-3 py-2 outline-none focus:border-accent">
+             class="flex-1 rounded-lg bg-surface border border-border placeholder:text-muted px-3 py-2 outline-none focus:border-accent">
       <button id="go" type="submit"
               class="rounded-lg bg-action text-on-action px-4 py-2 font-medium hover:bg-action-hover disabled:opacity-50 disabled:cursor-not-allowed">
         Transcrire
       </button>
     </form>
 
-    <p id="status" class="mt-3 min-h-6 text-sm text-muted"></p>
+    <p id="status" class="mt-3 min-h-6 text-sm text-accent"></p>
     <p id="error" role="alert" class="mt-1 text-sm text-danger"></p>
 
     <div class="relative mt-3">
       <textarea id="out" readonly placeholder="La transcription apparaît ici."
-                class="h-[60vh] w-full resize-y rounded-lg bg-surface border border-line p-3 pr-12 text-sm leading-relaxed outline-none"></textarea>
+                class="h-[60vh] w-full resize-y rounded-lg bg-surface border border-border placeholder:text-muted p-3 pr-12 text-sm leading-relaxed outline-none"></textarea>
       <button id="copy" type="button" title="Copier" aria-label="Copier la transcription"
               class="absolute right-2 top-2 rounded-md bg-line p-2 hover:bg-action-hover hover:text-on-action">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
