@@ -8,7 +8,7 @@ dependencies = [
     "faster-whisper==1.2.1",
     # Temporary bound: PyAV 19 breaks faster-whisper 1.2.1 (metadata_errors). Lift it once
     # faster-whisper or PyAV fixes it, see aidd_docs/memory/internal/decisions/stack.md.
-    "av>=15,<19",
+    "av>=18.1.0,<19",
     "yt-dlp",
     "deno",
 ]
