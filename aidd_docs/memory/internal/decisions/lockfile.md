@@ -36,7 +36,7 @@ On passe à `uv`, avec `pyproject.toml` pour la déclaration et `uv.lock` pour l
 - **Dependabot** gère l'écosystème `uv` pour les mises à jour de version (doc `supported-package-managers.md`). Pour les mises à jour de sécurité, la doc dépend d'un drapeau GitHub, non confirmé pour ce dépôt.
 - **Build** : `uv sync --frozen --no-install-project --no-dev --group gpu` dans `python:3.12-slim` passe en 2 min, image de 4,77 Go contre 4,76 Go aujourd'hui. Sans `--no-dev`, `uv sync` installe le groupe `dev` par défaut et l'image grossit de 0,4 Go (ruff, pyright, pytest).
 - **GPU** : dans cette image, `entrypoint.sh` trouve les libs `nvidia-*`, `ctranslate2` voit 1 GPU, et la vidéo `KnXm3PbNz5A` (15 min) est transcrite en 35 s, 3 680 mots, sans erreur. `stack.md` mesure 30 s avec l'image actuelle.
-- **PyAV** reste en `15.1.0` dans le lock, avec la borne `<19`. La PR #24 propose `av>=19.0.1`, qui casse faster-whisper d'après `stack.md`.
+- **PyAV** était en `15.1.0` dans le lock le 2026-10-07, avec la borne `<19`. Il est en `18.1.0` depuis la PR #33. La PR #24 propose `av>=19.0.1`, qui casse faster-whisper d'après `stack.md`.
 
 ## Risque accepté
 
