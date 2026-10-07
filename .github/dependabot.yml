@@ -8,3 +8,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # PyAV 19 breaks faster-whisper 1.2.1 (metadata_errors), see aidd_docs/memory/architecture.md.
+      - dependency-name: av
+        versions: [">=16"]
