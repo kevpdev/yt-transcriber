@@ -1,5 +1,10 @@
 #!/bin/sh
 # Chaîne de contrôle, du plus déterministe au plus lent, arrêtée à la première étape en échec.
+#   1 ruff format --check   mise en forme
+#   2 ruff check            lint
+#   3 pyright               types
+#   4 pytest                tests unitaires et API, seuil de couverture 80 %
+# Tout tourne dans un conteneur python:3.12-slim : seul Docker est requis sur l'hôte, en local comme en CI.
 # `--fast` s'arrête après le typecheck (étapes 1 à 3), c'est ce que lance le hook pre-commit.
 set -e
 

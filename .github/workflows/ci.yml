@@ -8,13 +8,17 @@ permissions:
 
 jobs:
   check:
+    name: check (ruff, pyright, pytest)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: scripts/check.sh
+      - name: Format, lint, types and unit tests (scripts/check.sh)
+        run: scripts/check.sh
 
   e2e:
+    name: e2e (Playwright, fake transcriber)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: scripts/e2e.sh fake
+      - name: Page tests against the app with YT_FAKE=1 (scripts/e2e.sh fake)
+        run: scripts/e2e.sh fake
