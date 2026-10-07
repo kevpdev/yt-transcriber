@@ -41,7 +41,7 @@ Elles sont déclarées dans `pyproject.toml` et figées dans `uv.lock`. Dependab
 | `deno` | exécute le JavaScript dont `yt-dlp` a besoin | sans lui, YouTube cache des formats |
 | `nvidia-cublas-cu12`, `nvidia-cudnn-cu12` | bibliothèques CUDA appelées par le modèle | groupe `gpu` de `pyproject.toml`, `entrypoint.sh` règle `LD_LIBRARY_PATH` |
 
-Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/stack.md) pour la stack, [`lockfile.md`](aidd_docs/memory/internal/decisions/lockfile.md) pour le lockfile.
+Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/stack.md) pour la stack, [`lockfile.md`](aidd_docs/memory/internal/decisions/lockfile.md) pour le lockfile, [`page-files.md`](aidd_docs/memory/internal/decisions/page-files.md) pour le découpage de la page.
 
 ## API
 

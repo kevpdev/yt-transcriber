@@ -33,7 +33,7 @@ Toujours pas de build front.
 
 ## Risque accepté
 
-La page fait trois requêtes de plus au chargement (`theme.css`, `app.js`). L'outil est local, le coût est négligeable. Les variables sont chargées par `<link>` avant le script Tailwind, donc sans flash de style.
+La page fait deux requêtes de plus au chargement (`theme.css`, `app.js`). L'outil est local, le coût est négligeable. Les variables sont chargées par `<link>` avant le script Tailwind, donc sans flash de style.
 
 ## Conséquences
 
