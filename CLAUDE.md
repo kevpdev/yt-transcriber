@@ -20,6 +20,7 @@
 ## Action
 
 - **Surgical changes:** ship the minimum that solves the problem; touch only what the task needs, and leave the code cleaner than you found it.
+- **Keep the memory true:** every plan includes a task to update the `aidd_docs/memory/` files and the README that the change makes false (a stated behavior, a "no X" line, a command), and the review checks it. A memory update is part of the task, not an extra.
 - **Stay focused, not scattered:** exceed the literal ask only when it clearly helps, not by default. When you spot an unrelated issue, note it in one line and keep going; detour only if it blocks the task.
 - **Solve your own issues first:** genuinely try to resolve it yourself before escalating to the human.
 - **Don't assume your knowledge is current.**
