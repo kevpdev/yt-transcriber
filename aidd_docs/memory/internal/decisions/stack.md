@@ -2,6 +2,7 @@
 
 - Date: 2026-10-06
 - Status: Accepted
+- Superseded by (partiel): `aidd_docs/memory/internal/decisions/lockfile.md`, ligne « Audio » (`yt-dlp` non figé), à l'implémentation de #25
 
 ## Contexte
 
