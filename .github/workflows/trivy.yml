@@ -1,0 +1,40 @@
+name: trivy
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Trivy reads only `==` pins in requirements.txt. Resolve the full tree
+      # (transitive included) into a pinned file, without installing anything.
+      - name: Resolve pinned dependencies
+        run: |
+          mkdir resolved
+          python3 -m pip install --dry-run --ignore-installed --quiet \
+            --report resolved/report.json -r requirements.txt
+          python3 -c "
+          import json
+          r = json.load(open('resolved/report.json'))
+          lines = sorted(f\"{i['metadata']['name']}=={i['metadata']['version']}\" for i in r['install'])
+          open('resolved/requirements.txt', 'w').write('\n'.join(lines) + '\n')
+          "
+          cat resolved/requirements.txt
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          limit-severities-for-sarif: true
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
