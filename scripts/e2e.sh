@@ -86,7 +86,7 @@ case "$LEVEL" in
     STARTED=fake
     export E2E_LEVEL=fake
     docker build -q -t "$APP_IMAGE" "$ROOT" >/dev/null
-    docker run -d --rm --name "$APP_NAME" -e YT_FAKE=1 --network host "$APP_IMAGE" >/dev/null
+    docker run -d --name "$APP_NAME" -e YT_FAKE=1 --network host "$APP_IMAGE" >/dev/null
     wait_for_page
     run_suite
     ;;
