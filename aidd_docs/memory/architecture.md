@@ -33,7 +33,7 @@ flowchart TD
 
 ## Gotchas
 
-- PyAV stays in `>=15,<16`, version 19 breaks faster-whisper with a `metadata_errors` error.
+- PyAV is bounded to `>=15,<19`, a temporary bound: version 19 breaks faster-whisper 1.2.1 with a `metadata_errors` error. Lift it once faster-whisper or PyAV fixes it.
 - `entrypoint.sh` computes `LD_LIBRARY_PATH` from `__path__`, because the `nvidia` packages are namespaces and their `__file__` is `None`.
 - yt-dlp needs `deno`, without it YouTube hides formats.
 - `build_app` is the uvicorn factory. Tests call `create_app` with fakes, so they import without a GPU.
