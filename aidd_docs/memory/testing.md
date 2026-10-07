@@ -5,7 +5,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 ## Strategy
 
 - Unit and API-level tests in `tests/`, run without a GPU and without network.
-- `create_app` takes the transcriber and the downloader as arguments, so tests inject fakes (`FakeTranscriber`, `fake_download`, both in `app/fake.py`) and drive the real routes.
+- `create_app` takes the transcriber and the downloader as arguments, so tests inject fakes and drive the real routes. `tests/test_jobs.py` defines its own `FakeTranscriber` and `fake_download`, and `app/fake.py` holds the pair that `YT_FAKE=1` and `tests/test_fake.py` use.
 - Browser end-to-end tests in `e2e/`, at two levels, see the E2E section. The `real` level is the check of the real Whisper model and yt-dlp path, on video `KnXm3PbNz5A`.
 
 ## Tools

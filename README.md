@@ -54,7 +54,7 @@ git config core.hooksPath scripts/hooks
 Cinq contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
 
 ```sh
-scripts/e2e.sh fake   # Docker seul, sans GPU ni réseau : l'appli tourne avec YT_FAKE=1
+scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1
 scripts/e2e.sh real   # Docker et GPU : le vrai modèle, sur la vidéo KnXm3PbNz5A
 ```
 
