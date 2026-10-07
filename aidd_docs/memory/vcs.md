@@ -31,4 +31,4 @@ The branch prefix maps to an existing label. A prefix with no row gets no label.
 
 ## Commit Strategy
 
-AI should auto commit: `never`
+AI should auto commit: `only when driven by aidd-orchestrator:01-sdlc, never otherwise`
