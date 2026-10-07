@@ -1,4 +1,4 @@
-"""The five page checks, replayed identically on the fake transcriber and on the real model.
+"""The page checks, replayed identically on the fake transcriber and on the real model.
 
 The tests share one server that accepts a single job at a time: each test that starts
 a job waits for "Terminé." (the page's done status) before returning.
@@ -9,6 +9,7 @@ import re
 from playwright.sync_api import expect
 
 KEY = "yt-transcriber-job"
+THEME_KEY = "yt-transcriber-theme"
 # The real model takes about 30 s, the margin covers the download.
 DONE_TIMEOUT = 240_000
 RUNNING = re.compile("Transcription|Téléchargement")
@@ -100,3 +101,22 @@ def test_copy_puts_the_whole_text_in_the_clipboard(page, base_url, video_url, e2
     # Ctrl+V pastes nothing in headless Chromium, Shift+Insert does.
     page.keyboard.press("Shift+Insert")
     assert page.input_value("#url") == text
+
+
+def test_theme_toggle_is_kept_after_reload(page, base_url):
+    page.emulate_media(color_scheme="dark")
+    page.goto(base_url)
+    page.evaluate("key => localStorage.removeItem(key)", THEME_KEY)
+    page.reload()
+    # No saved choice: the page follows the system.
+    expect(page.locator("html")).to_have_class(re.compile(r"\bdark\b"))
+    expect(page.locator("#theme")).to_have_attribute("aria-pressed", "true")
+
+    page.click("#theme")
+    expect(page.locator("html")).not_to_have_class(re.compile(r"\bdark\b"))
+    expect(page.locator("#theme")).to_have_attribute("aria-pressed", "false")
+
+    page.reload()
+    expect(page.locator("html")).not_to_have_class(re.compile(r"\bdark\b"))
+    assert page.evaluate("key => localStorage.getItem(key)", THEME_KEY) == "light"
+    page.evaluate("key => localStorage.removeItem(key)", THEME_KEY)

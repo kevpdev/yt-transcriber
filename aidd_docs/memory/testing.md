@@ -25,7 +25,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 ## E2E
 
-- `e2e/` holds five Playwright scenarios (invalid URL, reload during a job, brief network cut, unknown job, copy), the same suite at both levels. `scripts/e2e.sh` forwards `E2E_VIDEO_URL` and `E2E_LEVEL` (`fake` or `real`) to the container. `E2E_BASE_URL` only applies when pytest is run directly against another server.
+- `e2e/` holds six Playwright scenarios (invalid URL, reload during a job, brief network cut, unknown job, copy, theme toggle), the same suite at both levels. `scripts/e2e.sh` forwards `E2E_VIDEO_URL` and `E2E_LEVEL` (`fake` or `real`) to the container. `E2E_BASE_URL` only applies when pytest is run directly against another server.
 - `scripts/e2e.sh fake`: Docker only. The app image runs with `YT_FAKE=1`, which swaps in the fake transcriber and downloader (a job takes about 10 s), and a Playwright container drives it.
 - `scripts/e2e.sh real`: Docker and the NVIDIA GPU. `docker compose up` runs the real model, the suite targets `KnXm3PbNz5A`.
 - `YT_FAKE` is read only in `build_app` and is never set by `compose.yaml`.

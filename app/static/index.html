@@ -4,29 +4,112 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>yt-transcriber</title>
+  <script>
+    // Runs before first paint to avoid a flash: a saved choice wins, else the system theme.
+    // The key and the media query are defined here once, the toggle script at the end of body reuses them.
+    var THEME_KEY = "yt-transcriber-theme";
+    var systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+      var dark = saved ? saved === "dark" : systemDark.matches;
+      document.documentElement.classList.toggle("dark", dark);
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @custom-variant dark (&:where(.dark, .dark *));
+
+    /* Palette B (lagoon and coral), WCAG contrast ratios measured on 2026-10-07,
+       with the exact color-mix results. Text needs 4.5, components 3.
+       Light: text 16.79 on canvas, 17.79 on surface
+              muted 5.98 on canvas, 6.33 on surface (placeholders sit on surface)
+              white on action 4.82, white on hovered action 5.7
+              accent 4.87 on canvas, danger 6.10 on canvas
+              action 4.55 on canvas (component, and the status line text)
+              field border 3.41 on canvas, 3.61 on surface
+              text on line 12.07 (copy and theme icons)
+       Dark:  text 16.79 on canvas, 14.91 on surface
+              muted 8.24 on canvas, 7.31 on surface
+              dark text on action 4.83, dark text on hovered action 5.6
+              accent 6.61 on canvas, danger 6.43 on canvas
+              action 4.83 on canvas (component, and the status line text)
+              field border 4.09 on canvas, 3.63 on surface
+              text on line 11.35 (copy and theme icons)
+       Accent (coral) only colors the focus border of the URL field. It stays out of the
+       status line because it is too close to danger in dark (1.03 between them).
+       --line is the soft fill of the icon buttons, --border outlines the fields. */
+    :root {
+      color-scheme: light;
+      --canvas: #FAF8F5;
+      --surface: #FFFFFF;
+      --line: #D9D4CC;
+      --border: #8C867C;
+      --ink: #14181F;
+      --muted: color-mix(in srgb, var(--canvas) 32%, var(--ink) 68%);
+      --action: #0C7C99;
+      --on-action: #FFFFFF;
+      --action-hover: color-mix(in srgb, var(--action) 88%, var(--ink) 12%);
+      --accent: #D6193F;
+      --danger: #B91C1C;
+    }
+    html.dark {
+      color-scheme: dark;
+      --canvas: #14181F;
+      --surface: #1D232C;
+      --line: #2E3744;
+      --border: #6E7A8C;
+      --ink: #FAF8F5;
+      --action: #0891B2;
+      --on-action: #14181F;
+      --accent: #FB7185;
+      --danger: #F87171;
+    }
+    @theme inline {
+      --color-canvas: var(--canvas);
+      --color-surface: var(--surface);
+      --color-line: var(--line);
+      --color-border: var(--border);
+      --color-ink: var(--ink);
+      --color-muted: var(--muted);
+      --color-action: var(--action);
+      --color-on-action: var(--on-action);
+      --color-action-hover: var(--action-hover);
+      --color-accent: var(--accent);
+      --color-danger: var(--danger);
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100">
+<body class="min-h-screen bg-canvas text-ink">
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <h1 class="text-2xl font-semibold mb-6">yt-transcriber</h1>
+    <header class="mb-6 flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">yt-transcriber</h1>
+      <button id="theme" type="button" aria-label="Thème sombre" aria-pressed="false"
+              class="rounded-md bg-line p-2 hover:bg-action-hover hover:text-on-action">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+        </svg>
+      </button>
+    </header>
 
     <form id="form" class="flex gap-2">
       <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"
-             class="flex-1 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 outline-none focus:border-sky-500">
+             class="flex-1 rounded-lg bg-surface border border-border placeholder:text-muted px-3 py-2 outline-none focus:border-accent">
       <button id="go" type="submit"
-              class="rounded-lg bg-sky-600 px-4 py-2 font-medium hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              class="rounded-lg bg-action text-on-action px-4 py-2 font-medium hover:bg-action-hover disabled:opacity-50 disabled:cursor-not-allowed">
         Transcrire
       </button>
     </form>
 
-    <p id="status" class="mt-3 min-h-6 text-sm text-slate-400"></p>
-    <p id="error" role="alert" class="mt-1 text-sm text-red-400"></p>
+    <p id="status" class="mt-3 min-h-6 text-sm text-action"></p>
+    <p id="error" role="alert" class="mt-1 text-sm text-danger"></p>
 
     <div class="relative mt-3">
       <textarea id="out" readonly placeholder="La transcription apparaît ici."
-                class="h-[60vh] w-full resize-y rounded-lg bg-slate-900 border border-slate-700 p-3 pr-12 text-sm leading-relaxed outline-none"></textarea>
+                class="h-[60vh] w-full resize-y rounded-lg bg-surface border border-border placeholder:text-muted p-3 pr-12 text-sm leading-relaxed outline-none"></textarea>
       <button id="copy" type="button" title="Copier" aria-label="Copier la transcription"
-              class="absolute right-2 top-2 rounded-md bg-slate-800 p-2 hover:bg-slate-700">
+              class="absolute right-2 top-2 rounded-md bg-line p-2 hover:bg-action-hover hover:text-on-action">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
           <rect x="9" y="9" width="13" height="13" rx="2"></rect>
@@ -35,6 +118,27 @@
       </button>
     </div>
   </main>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const button = document.getElementById("theme");
+      const sync = () => button.setAttribute("aria-pressed", String(root.classList.contains("dark")));
+      const hasChoice = () => { try { return localStorage.getItem(THEME_KEY) !== null; } catch { return false; } };
+      sync();
+      button.addEventListener("click", () => {
+        const dark = !root.classList.contains("dark");
+        root.classList.toggle("dark", dark);
+        try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch {}
+        sync();
+      });
+      systemDark.addEventListener("change", (ev) => {
+        if (hasChoice()) return;
+        root.classList.toggle("dark", ev.matches);
+        sync();
+      });
+    })();
+  </script>
 
   <script>
     const $ = (id) => document.getElementById(id);
