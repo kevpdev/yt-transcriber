@@ -6,10 +6,13 @@
   <title>yt-transcriber</title>
   <script>
     // Runs before first paint to avoid a flash: a saved choice wins, else the system theme.
+    // The key and the media query are defined here once, the toggle script at the end of body reuses them.
+    var THEME_KEY = "yt-transcriber-theme";
+    var systemDark = window.matchMedia("(prefers-color-scheme: dark)");
     (function () {
       var saved = null;
-      try { saved = localStorage.getItem("yt-transcriber-theme"); } catch (e) {}
-      var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+      var dark = saved ? saved === "dark" : systemDark.matches;
       document.documentElement.classList.toggle("dark", dark);
     })();
   </script>
@@ -23,16 +26,18 @@
               muted 5.98 on canvas, 6.33 on surface (placeholders sit on surface)
               white on action 4.82, white on hovered action 5.7
               accent 4.87 on canvas, danger 6.10 on canvas
-              action 4.55 on canvas (component)
+              action 4.55 on canvas (component, and the status line text)
               field border 3.41 on canvas, 3.61 on surface
               text on line 12.07 (copy and theme icons)
        Dark:  text 16.79 on canvas, 14.91 on surface
               muted 8.24 on canvas, 7.31 on surface
               dark text on action 4.83, dark text on hovered action 5.6
               accent 6.61 on canvas, danger 6.43 on canvas
-              action 4.83 on canvas (component)
+              action 4.83 on canvas (component, and the status line text)
               field border 4.09 on canvas, 3.63 on surface
               text on line 11.35 (copy and theme icons)
+       Accent (coral) only colors the focus border of the URL field. It stays out of the
+       status line because it is too close to danger in dark (1.03 between them).
        --line is the soft fill of the icon buttons, --border outlines the fields. */
     :root {
       color-scheme: light;
@@ -97,7 +102,7 @@
       </button>
     </form>
 
-    <p id="status" class="mt-3 min-h-6 text-sm text-accent"></p>
+    <p id="status" class="mt-3 min-h-6 text-sm text-action"></p>
     <p id="error" role="alert" class="mt-1 text-sm text-danger"></p>
 
     <div class="relative mt-3">
@@ -117,7 +122,6 @@
   <script>
     (function () {
       const root = document.documentElement;
-      const THEME_KEY = "yt-transcriber-theme";
       const button = document.getElementById("theme");
       const sync = () => button.setAttribute("aria-pressed", String(root.classList.contains("dark")));
       const hasChoice = () => { try { return localStorage.getItem(THEME_KEY) !== null; } catch { return false; } };
@@ -128,7 +132,7 @@
         try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch {}
         sync();
       });
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (ev) => {
+      systemDark.addEventListener("change", (ev) => {
         if (hasChoice()) return;
         root.classList.toggle("dark", ev.matches);
         sync();
