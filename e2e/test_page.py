@@ -14,6 +14,18 @@ DONE_TIMEOUT = 240_000
 RUNNING = re.compile("Transcription|Téléchargement")
 
 
+def wait_done(page):
+    """Attend « Terminé. », et échoue tout de suite avec le message si le job finit en erreur."""
+    page.wait_for_function(
+        "() => document.getElementById('status').textContent === 'Terminé.'"
+        " || document.getElementById('error').textContent !== ''",
+        timeout=DONE_TIMEOUT,
+    )
+    error = page.inner_text("#error")
+    assert not error, f"le job a échoué : {error}"
+    expect(page.locator("#status")).to_have_text("Terminé.")
+
+
 def submit(page, base_url, video_url):
     page.goto(base_url)
     page.fill("#url", video_url)
@@ -49,7 +61,7 @@ def test_reload_during_a_job_resumes_it(page, base_url, video_url):
     )
     page.reload()
     expect(page.locator("#status")).to_have_text("Reprise du job en cours…")
-    expect(page.locator("#status")).to_have_text("Terminé.", timeout=DONE_TIMEOUT)
+    wait_done(page)
     expect(page.locator("#out")).not_to_be_empty()
 
 
@@ -61,7 +73,7 @@ def test_brief_network_cut_is_retried(page, context, base_url, video_url):
     # Au total 3 s hors ligne : la page abandonne au cinquième échec, à 2 s d'intervalle.
     page.wait_for_timeout(2_000)
     context.set_offline(False)
-    expect(page.locator("#status")).to_have_text("Terminé.", timeout=DONE_TIMEOUT)
+    wait_done(page)
 
 
 def test_unknown_job_is_cleared(page, base_url):
@@ -75,7 +87,7 @@ def test_unknown_job_is_cleared(page, base_url):
 
 def test_copy_puts_the_whole_text_in_the_clipboard(page, base_url, video_url, e2e_level):
     submit(page, base_url, video_url)
-    expect(page.locator("#status")).to_have_text("Terminé.", timeout=DONE_TIMEOUT)
+    wait_done(page)
     text = page.input_value("#out")
     assert text
     # Le niveau real ne doit jamais tourner sur le faux transcripteur, ni l'inverse.

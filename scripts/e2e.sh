@@ -12,6 +12,8 @@ PLAYWRIGHT_IMAGE=mcr.microsoft.com/playwright/python:v1.63.0-noble
 APP_IMAGE=yt-transcriber-e2e
 APP_NAME=yt-transcriber-e2e-app
 PW_NAME=yt-transcriber-e2e-pw
+# Posé une fois les gardes passés : cleanup ne touche que ce que ce run a lancé.
+STARTED=
 
 wait_for_page() {
   i=0
@@ -31,6 +33,10 @@ ensure_port_free() {
   fi
   rc=0
   curl -s -o /dev/null --max-time 2 http://localhost:8000/ || rc=$?
+  if [ "$rc" -eq 127 ]; then
+    echo "curl est introuvable : installe-le sur l'hôte, il sert à tester le port 8000" >&2
+    exit 1
+  fi
   # 7 = connexion refusée, le port est libre. Tout autre code : quelque chose écoute.
   if [ "$rc" -ne 7 ]; then
     echo "le port 8000 est déjà utilisé (curl rc=$rc) : arrête ce qui écoute avant de lancer les e2e" >&2
@@ -39,8 +45,19 @@ ensure_port_free() {
 }
 
 cleanup() {
+  status=$?
+  # Un run refusé par les gardes n'a rien lancé : il ne doit rien arrêter.
+  [ -n "$STARTED" ] || return 0
+  if [ "$status" -ne 0 ]; then
+    echo "--- journaux de l'appli (statut $status) ---" >&2
+    if [ "$STARTED" = real ]; then
+      docker compose -f "$ROOT/compose.yaml" logs --tail 40 >&2 2>&1 || true
+    else
+      docker logs --tail 40 "$APP_NAME" >&2 2>&1 || true
+    fi
+  fi
   docker rm -f "$PW_NAME" >/dev/null 2>&1 || true
-  if [ "$LEVEL" = real ]; then
+  if [ "$STARTED" = real ]; then
     docker compose -f "$ROOT/compose.yaml" down >/dev/null 2>&1 || true
   else
     docker rm -f "$APP_NAME" >/dev/null 2>&1 || true
@@ -66,6 +83,7 @@ python -m pytest e2e -p no:cacheprovider
 case "$LEVEL" in
   fake)
     ensure_port_free
+    STARTED=fake
     export E2E_LEVEL=fake
     docker build -q -t "$APP_IMAGE" "$ROOT" >/dev/null
     docker run -d --rm --name "$APP_NAME" -e YT_FAKE=1 --network host "$APP_IMAGE" >/dev/null
@@ -74,6 +92,7 @@ case "$LEVEL" in
     ;;
   real)
     ensure_port_free
+    STARTED=real
     export E2E_LEVEL=real
     docker compose -f "$ROOT/compose.yaml" up -d --build
     # La page n'est servie qu'une fois le modèle chargé, le premier démarrage le télécharge.
