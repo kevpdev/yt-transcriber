@@ -1,6 +1,6 @@
 #!/bin/sh
-# Activation : git config core.hooksPath scripts/hooks
-# Contrôle le contenu indexé, pas l'arbre de travail : on exporte l'index dans un dossier jetable.
+# Enable with: git config core.hooksPath scripts/hooks
+# Checks the staged content, not the working tree: the index is exported to a throwaway directory.
 set -e
 TOP=$(git rev-parse --show-toplevel)
 TMP=$(mktemp -d)

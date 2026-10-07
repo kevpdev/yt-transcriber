@@ -1,7 +1,7 @@
-"""Les cinq contrôles de la page, rejoués identiques sur le faux transcripteur et sur le vrai modèle.
+"""The five page checks, replayed identically on the fake transcriber and on the real model.
 
-Les tests partagent un seul serveur qui n'accepte qu'un job à la fois : chaque test qui lance
-un job l'attend jusqu'à « Terminé. » avant de rendre la main.
+The tests share one server that accepts a single job at a time: each test that starts
+a job waits for "Terminé." (the page's done status) before returning.
 """
 
 import re
@@ -9,20 +9,20 @@ import re
 from playwright.sync_api import expect
 
 KEY = "yt-transcriber-job"
-# Le vrai modèle met environ 30 s, la marge couvre le téléchargement.
+# The real model takes about 30 s, the margin covers the download.
 DONE_TIMEOUT = 240_000
 RUNNING = re.compile("Transcription|Téléchargement")
 
 
 def wait_done(page):
-    """Attend « Terminé. », et échoue tout de suite avec le message si le job finit en erreur."""
+    """Wait for "Terminé.", and fail at once with the message if the job ends in error."""
     page.wait_for_function(
         "() => document.getElementById('status').textContent === 'Terminé.'"
         " || document.getElementById('error').textContent !== ''",
         timeout=DONE_TIMEOUT,
     )
     error = page.inner_text("#error")
-    assert not error, f"le job a échoué : {error}"
+    assert not error, f"the job failed: {error}"
     expect(page.locator("#status")).to_have_text("Terminé.")
 
 
@@ -45,7 +45,7 @@ def test_reload_during_a_job_resumes_it(page, base_url, video_url):
     submit(page, base_url, video_url)
     expect(page.locator("#status")).to_have_text(RUNNING, timeout=30_000)
 
-    # Retarde le premier poll après le rechargement pour pouvoir lire la ligne de reprise.
+    # Delay the first poll after the reload so the resume line can be read.
     page.add_init_script(
         """
         const realFetch = window.fetch;
@@ -70,7 +70,7 @@ def test_brief_network_cut_is_retried(page, context, base_url, video_url):
     expect(page.locator("#status")).to_have_text(RUNNING, timeout=30_000)
     context.set_offline(True)
     expect(page.locator("#status")).to_have_text("Connexion perdue, nouvelle tentative…", timeout=10_000)
-    # Au total 3 s hors ligne : la page abandonne au cinquième échec, à 2 s d'intervalle.
+    # 3 s offline in total: the page gives up at the fifth failure, 2 s apart.
     page.wait_for_timeout(2_000)
     context.set_offline(False)
     wait_done(page)
@@ -90,13 +90,13 @@ def test_copy_puts_the_whole_text_in_the_clipboard(page, base_url, video_url, e2
     wait_done(page)
     text = page.input_value("#out")
     assert text
-    # Le niveau real ne doit jamais tourner sur le faux transcripteur, ni l'inverse.
+    # The real level must never run on the fake transcriber, nor the reverse.
     if e2e_level:
         assert ("transcription factice" in text) == (e2e_level == "fake")
     page.click("#copy")
     expect(page.locator("#status")).to_have_text("Texte copié dans le presse-papiers.")
     page.fill("#url", "")
     page.focus("#url")
-    # Ctrl+V ne colle rien dans Chromium headless, Shift+Insert si.
+    # Ctrl+V pastes nothing in headless Chromium, Shift+Insert does.
     page.keyboard.press("Shift+Insert")
     assert page.input_value("#url") == text

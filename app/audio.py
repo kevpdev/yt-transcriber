@@ -6,7 +6,7 @@ _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class AudioError(Exception):
-    """Téléchargement impossible, le message est destiné à l'utilisateur."""
+    """Download failed, the message is meant for the end user."""
 
 
 def _readable(raw: str) -> str:

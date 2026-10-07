@@ -6,7 +6,7 @@ _HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"
 
 
 class InvalidUrl(ValueError):
-    """URL refusée, le message est destiné à l'utilisateur."""
+    """URL rejected, the message is meant for the end user."""
 
 
 def parse_video_id(raw: str) -> str:

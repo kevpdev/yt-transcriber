@@ -43,7 +43,7 @@ def create_app(transcriber=None, download=download_audio) -> FastAPI:
             store.finish(job, text)
         except AudioError as exc:
             store.fail(job, str(exc))
-        except Exception as exc:  # noqa: BLE001 - le job échoue, l'application continue
+        except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
             store.fail(job, f"Erreur inattendue pendant la transcription : {exc}")
 
     @app.post("/jobs", status_code=202)
@@ -74,7 +74,7 @@ def create_app(transcriber=None, download=download_audio) -> FastAPI:
 
 
 def build_app() -> FastAPI:
-    # lancé par `uvicorn --factory app.main:build_app`, les tests importent sans GPU
+    # started by `uvicorn --factory app.main:build_app`, tests import it without a GPU
     if os.environ.get("YT_FAKE") == "1":
         return create_app(FakeTranscriber(), fake_download)
     return create_app()

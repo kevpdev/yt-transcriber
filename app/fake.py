@@ -1,4 +1,4 @@
-"""Transcripteur et téléchargeur factices, activés par YT_FAKE=1, sans GPU ni réseau."""
+"""Fake transcriber and downloader, enabled by YT_FAKE=1, with no GPU and no network."""
 
 import time
 from collections.abc import Callable
@@ -9,7 +9,7 @@ FAKE_TEXT = (
     "Elle sert aux tests de bout en bout de la page, sans GPU. "
     "Le texte est assez long pour vérifier la copie en entier."
 )
-# Assez long pour recharger la page et couper le réseau pendant le job.
+# Long enough to reload the page and cut the network during the job.
 FAKE_DURATION = 10.0
 _STEPS = 10
 
@@ -21,7 +21,7 @@ def fake_download(url: str, dest_dir: Path) -> Path:
 
 
 class FakeTranscriber:
-    model = object()  # non None : le lifespan n'appelle pas load()
+    model = object()  # not None: the lifespan does not call load()
 
     def run(self, audio: Path, on_progress: Callable[[float], None]) -> str:
         for step in range(1, _STEPS + 1):
