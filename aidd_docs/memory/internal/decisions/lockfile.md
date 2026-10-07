@@ -11,7 +11,7 @@ Prépare l'issue #25.
 Les dépendances vivent dans `requirements.txt`, sans lockfile. Quatre des six lignes n'ont aucune version (`fastapi`, `uvicorn[standard]`, `yt-dlp`, `deno`). Deux conséquences mesurées le 2026-10-07 :
 
 - **Trivy ne voyait qu'une dépendance sur six.** Il ne lit que les lignes `==` et ignore les transitives (doc `docs/guide/coverage/language/python.md`). La PR #21 ajoute donc une étape qui résout l'arbre complet à chaque scan.
-- **Deux builds du même commit n'installent pas les mêmes versions.** Le piège PyAV de `stack.md` en est un exemple : la version 19 casse faster-whisper, et seule la borne `<16` protège.
+- **Deux builds du même commit n'installent pas les mêmes versions.** Le piège PyAV de `stack.md` en est un exemple : la version 19 casse faster-whisper, et seule la borne `<19` protège.
 
 `stack.md` demande que `yt-dlp` reste libre, parce que YouTube change souvent et qu'un `docker compose build --no-cache` suffit à suivre. Un lockfile fige justement ce que cette règle laisse flotter.
 
@@ -36,7 +36,7 @@ On passe à `uv`, avec `pyproject.toml` pour la déclaration et `uv.lock` pour l
 - **Dependabot** gère l'écosystème `uv` pour les mises à jour de version (doc `supported-package-managers.md`). Pour les mises à jour de sécurité, la doc dépend d'un drapeau GitHub, non confirmé pour ce dépôt.
 - **Build** : `uv sync --frozen --no-install-project --no-dev --group gpu` dans `python:3.12-slim` passe en 2 min, image de 4,77 Go contre 4,76 Go aujourd'hui. Sans `--no-dev`, `uv sync` installe le groupe `dev` par défaut et l'image grossit de 0,4 Go (ruff, pyright, pytest).
 - **GPU** : dans cette image, `entrypoint.sh` trouve les libs `nvidia-*`, `ctranslate2` voit 1 GPU, et la vidéo `KnXm3PbNz5A` (15 min) est transcrite en 35 s, 3 680 mots, sans erreur. `stack.md` mesure 30 s avec l'image actuelle.
-- **PyAV** reste en `15.1.0` avec la borne `<16`. La PR #24 propose `av>=19.0.1`, qui casse faster-whisper d'après `stack.md`.
+- **PyAV** reste en `15.1.0` dans le lock, avec la borne `<19`. La PR #24 propose `av>=19.0.1`, qui casse faster-whisper d'après `stack.md`.
 
 ## Risque accepté
 

@@ -8,3 +8,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Temporary: PyAV 19 breaks faster-whisper 1.2.1 (metadata_errors). Remove once fixed upstream.
+      - dependency-name: av
+        versions: [">=19"]

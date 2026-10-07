@@ -1216,7 +1216,7 @@ gpu = [
 
 [package.metadata]
 requires-dist = [
-    { name = "av", specifier = ">=15,<16" },
+    { name = "av", specifier = ">=15,<19" },
     { name = "deno" },
     { name = "fastapi" },
     { name = "faster-whisper", specifier = "==1.2.1" },

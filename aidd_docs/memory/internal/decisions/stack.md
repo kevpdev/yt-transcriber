@@ -29,7 +29,7 @@ La machine cible est une RTX 5060 Ti de 16 Go, en compute capability 12.0 (Black
 
 ## Pièges mesurés, à respecter
 
-- **PyAV reste en `>=15,<16`.** PyAV 19.0.1 casse faster-whisper 1.2.1 avec l'erreur `open() got an unexpected keyword argument 'metadata_errors'`. PyAV 15.1.0 fonctionne.
+- **PyAV est borné à `>=15,<19`, borne temporaire.** PyAV 19.0.0 et 19.0.1 cassent faster-whisper 1.2.1 avec l'erreur `open() got an unexpected keyword argument 'metadata_errors'`. Mesuré le 2026-10-07 : de 15.0.0 à 18.1.0 le décodage passe sur un `.wav` généré, et une vraie transcription GPU de `KnXm3PbNz5A` (3 680 mots, 35 à 40 s) passe avec `av` 16.1.0 et 18.1.0 (17.x non testé en transcription), faster-whisper 1.2.1 étant la dernière version et déclarant `av>=11` sans borne haute. À lever quand faster-whisper ou PyAV corrige. Au départ la borne était `<16`, par prudence.
 - **`LD_LIBRARY_PATH` se calcule par `list(nvidia.cublas.lib.__path__)[0]`**, et de même pour `nvidia.cudnn.lib`. Ces paquets sont des namespaces, donc leur `__file__` vaut `None`.
 - **yt-dlp a besoin de `deno`.** Sans lui, il avertit que YouTube masque des formats. Le yt-dlp du système (2024.04.09) n'est pas utilisable.
 
