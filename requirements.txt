@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
 faster-whisper==1.2.1
-av>=15,<16
+av>=19.0.1,<20
 yt-dlp
 deno
