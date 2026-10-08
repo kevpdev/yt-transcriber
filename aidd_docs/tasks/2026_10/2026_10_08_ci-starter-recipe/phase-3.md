@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: ruleset appliqué, conformité prouvée sur ce dépôt
