@@ -1,6 +1,6 @@
 ---
 objective: "La CI de ce dépôt est capitalisée en une fiche réutilisable, un script mesure qu'un dépôt respecte le contrat, et la fiche tourne verte sur un second projet."
-status: in-progress
+status: implemented
 ---
 
 # Plan: fiche de démarrage CI et contrôle de conformité
