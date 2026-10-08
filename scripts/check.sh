@@ -19,9 +19,16 @@ cp -r /src /work && cd /work
 pip install -q uv==0.12.23
 export UV_PROJECT_ENVIRONMENT=/opt/venv VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
 uv sync -q --frozen --group dev
-echo "1/4 ruff format" && ruff format --check app tests
-echo "2/4 ruff check" && ruff check app tests
-echo "3/4 pyright" && pyright
+step() {
+  title=$1; shift
+  echo "::group::$title"
+  "$@" && rc=0 || rc=$?
+  echo "::endgroup::"
+  [ "$rc" = 0 ] || { echo "::error::$title failed"; exit "$rc"; }
+}
+step "1/4 ruff format" ruff format --check app tests
+step "2/4 ruff check" ruff check app tests
+step "3/4 pyright" pyright
 [ "$FAST" = 1 ] && exit 0
-echo "4/4 pytest" && python -m pytest -q -p no:cacheprovider
+step "4/4 pytest" python -m pytest -q -p no:cacheprovider
 '
