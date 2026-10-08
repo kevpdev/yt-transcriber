@@ -41,4 +41,4 @@ def test_rejects_other_input_with_a_message(url):
 
 
 def test_canonical_url_drops_extra_params():
-    assert canonical_url(VID) == "broken on purpose to prove the ci gate"
+    assert canonical_url(VID) == f"https://www.youtube.com/watch?v={VID}"
