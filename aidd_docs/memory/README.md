@@ -35,6 +35,7 @@ Refreshed automatically by the memory hook. Do not edit by hand.
 Read on demand:
 
 - [internal/decisions/lockfile.md](internal/decisions/lockfile.md)
+- [internal/decisions/page-files.md](internal/decisions/page-files.md)
 - [internal/decisions/stack.md](internal/decisions/stack.md)
 <!-- files:end -->
 

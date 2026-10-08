@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   check:
-    name: check (ruff, pyright, pytest)
+    name: check
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -16,7 +16,7 @@ jobs:
         run: scripts/check.sh
 
   e2e:
-    name: e2e (Playwright, fake transcriber)
+    name: e2e
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
