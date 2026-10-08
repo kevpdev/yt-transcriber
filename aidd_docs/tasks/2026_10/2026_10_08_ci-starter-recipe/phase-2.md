@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: agent-config, fiche, section `aidd.md`, scripts

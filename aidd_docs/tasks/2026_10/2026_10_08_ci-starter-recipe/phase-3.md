@@ -4,7 +4,7 @@ status: pending
 
 # Instruction: ruleset appliqué, conformité prouvée sur ce dépôt
 
-> Démarre une fois la PR de la phase 1 fusionnée.
+> Démarre avant la fusion de la PR #44 : les nouveaux noms y ont déjà rapporté, et le ruleset (sans acteur de contournement) bloque sinon la fusion sur les anciens contextes.
 
 ## Architecture projection
 
