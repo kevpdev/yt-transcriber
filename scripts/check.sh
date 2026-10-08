@@ -5,15 +5,20 @@
 #   3 pyright               types
 #   4 pytest                unit and API tests, 80 % coverage threshold
 # Everything runs in a python:3.12-slim container: only Docker is needed on the host, locally and in CI.
-# `--fast` stops after the typecheck (steps 1 to 3), which is what the pre-commit hook runs.
+# `--fast` stops after the typecheck (steps 1 to 3), which is what the pre-commit hook and the CI job
+# `lint` run. `--tests` runs step 4 only, which is what the CI job `unit-tests` runs.
 set -e
 
 ROOT=${CHECK_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
-FAST=0
-[ "$1" = "--fast" ] && FAST=1
+case "$1" in
+  "") MODE=all ;;
+  --fast) MODE=fast ;;
+  --tests) MODE=tests ;;
+  *) echo "usage: $0 [--fast|--tests]" >&2; exit 2 ;;
+esac
 
 # The mount is read-only: the tools work on a copy inside the container.
-exec docker run --rm -e FAST="$FAST" -v "$ROOT":/src:ro python:3.12-slim sh -c '
+exec docker run --rm -e MODE="$MODE" -v "$ROOT":/src:ro python:3.12-slim sh -c '
 set -e
 cp -r /src /work && cd /work
 pip install -q uv==0.12.23
@@ -26,9 +31,11 @@ step() {
   echo "::endgroup::"
   [ "$rc" = 0 ] || { echo "::error::$title failed"; exit "$rc"; }
 }
-step "1/4 ruff format" ruff format --check app tests
-step "2/4 ruff check" ruff check app tests
-step "3/4 pyright" pyright
-[ "$FAST" = 1 ] && exit 0
+if [ "$MODE" != tests ]; then
+  step "1/4 ruff format" ruff format --check app tests
+  step "2/4 ruff check" ruff check app tests
+  step "3/4 pyright" pyright
+fi
+[ "$MODE" = fast ] && exit 0
 step "4/4 pytest" python -m pytest -q -p no:cacheprovider
 '

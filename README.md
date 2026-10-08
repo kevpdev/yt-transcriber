@@ -54,7 +54,7 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 scripts/check.sh
 ```
 
-Enchaîne `ruff format --check`, `ruff check`, `pyright`, puis `pytest` avec un seuil de couverture de 80 %, dans un conteneur `python:3.12-slim`, et s'arrête à la première étape en échec. `scripts/check.sh --fast` s'arrête après `pyright`.
+Enchaîne `ruff format --check`, `ruff check`, `pyright`, puis `pytest` avec un seuil de couverture de 80 %, dans un conteneur `python:3.12-slim`, et s'arrête à la première étape en échec. `scripts/check.sh --fast` s'arrête après `pyright`, `scripts/check.sh --tests` ne lance que `pytest`.
 
 Pour que `git commit` lance les trois premières étapes sur le contenu indexé :
 
@@ -71,7 +71,7 @@ scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec Y
 scripts/e2e.sh real   # Docker et GPU : le vrai modèle, sur la vidéo KnXm3PbNz5A
 ```
 
-La CI GitHub lance sur chaque pull request vers `main` les jobs `check` (`scripts/check.sh`, un groupe de logs par outil), `e2e` (`scripts/e2e.sh fake`), `security` (Trivy) et `codeql` (Python et workflows GitHub Actions, non requis). Le niveau `real` reste local.
+La CI GitHub lance sur chaque pull request vers `main` les jobs `lint` (`scripts/check.sh --fast`), `unit-tests` (`scripts/check.sh --tests`), `e2e` (`scripts/e2e.sh fake`) et `security` (Trivy), puis la porte `ci`, qui échoue si l'un d'eux échoue et que la branche `main` est seule à exiger. `codeql` (Python et workflows GitHub Actions) tourne à part, non requis. Le niveau `real` reste local.
 
 Docker et `curl` doivent être présents sur l'hôte. `fake` construit l'image et lance l'appli avec un transcripteur factice (job d'environ 10 s). `real` lance `docker compose up` et exige le GPU, `nvidia-container-toolkit` et internet (YouTube). Les deux refusent de démarrer si le port 8000 est pris ou si une pile de l'appli tourne déjà, et libèrent le port à la fin, y compris sur Ctrl-C.
 

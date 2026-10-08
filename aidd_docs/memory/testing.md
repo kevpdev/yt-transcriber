@@ -21,7 +21,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 ## Run
 
-- `scripts/check.sh`, the commands are in `coding-assertions.md`. CI also runs it on pull requests.
+- `scripts/check.sh`, the commands are in `coding-assertions.md`. CI runs it on pull requests in two jobs, `lint` (`--fast`) and `unit-tests` (`--tests`).
 
 ## E2E
 
@@ -29,7 +29,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 - `scripts/e2e.sh fake`: Docker only. The app image runs with `YT_FAKE=1`, which swaps in the fake transcriber and downloader (a job takes about 10 s), and a Playwright container drives it.
 - `scripts/e2e.sh real`: Docker and the NVIDIA GPU. `docker compose up` runs the real model, the suite targets `KnXm3PbNz5A`.
 - `YT_FAKE` is read only in `build_app` and is never set by `compose.yaml`.
-- CI (`.github/workflows/ci.yml`) runs `scripts/e2e.sh fake` as its own job, `e2e`, on pull requests. The `real` level never runs in CI, it needs a GPU.
+- CI (`.github/workflows/ci.yml`) runs `scripts/e2e.sh fake` as its own job, `e2e`, on pull requests, awaited by the gate `ci`. The `real` level never runs in CI, it needs a GPU.
 - Outside `scripts/check.sh` on purpose: the check container has no Playwright, so `pyproject.toml` sets pytest `testpaths = ["tests"]`, and `ruff` and `pyright` only cover `app` and `tests`.
 - The Playwright image tag and `e2e/requirements.txt` are pinned to the same version (`playwright` 1.63.0, `pytest-playwright` 0.9.0).
 

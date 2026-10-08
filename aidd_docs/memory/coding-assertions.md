@@ -4,7 +4,7 @@ The checks that must pass for code to count as done. Minimal, run after every ch
 
 ## Before commit
 
-The fast gate, steps 1 to 3 of `scripts/check.sh --fast`. The pre-commit hook runs it on the staged content.
+The fast gate, steps 1 to 3 of `scripts/check.sh --fast`. The pre-commit hook runs it on the staged content, and so does the CI job `lint`.
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
@@ -14,7 +14,7 @@ The fast gate, steps 1 to 3 of `scripts/check.sh --fast`. The pre-commit hook ru
 
 ## Before push
 
-The full chain, `scripts/check.sh`: steps 1 to 3, then step 4.
+The full chain, `scripts/check.sh`: steps 1 to 3, then step 4. `scripts/check.sh --tests` runs step 4 alone, which is what the CI job `unit-tests` runs.
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
