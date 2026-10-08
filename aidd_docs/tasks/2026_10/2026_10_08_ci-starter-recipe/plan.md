@@ -36,4 +36,4 @@ status: in-progress
 | Trois jobs aux noms fixes : `check`, `security`, `e2e` (conditionnel) | les noms ne dépendent plus de la stack, le ruleset est le même partout |
 | `security` ne contient que Trivy. CodeQL vit dans `codeql.yml`, non requis | l'issue exclut CodeQL des checks requis tant que sa stabilité n'est pas mesurée |
 | `::group::` dans `check.sh` d'abord, une étape par outil seulement si le surcoût mesuré est faible | l'issue demande de mesurer avant de choisir |
-| Le ruleset se modifie après la fusion de la phase 1 | les anciens contextes requis bloqueraient la PR qui les renomme, les nouveaux n'existeraient pas encore |
+| Le ruleset se modifie avant la fusion de la phase 1, une fois les nouveaux noms rapportés sur la PR | le ruleset n'a aucun acteur de contournement, les anciens contextes bloquent la fusion et les nouveaux ont déjà rapporté |

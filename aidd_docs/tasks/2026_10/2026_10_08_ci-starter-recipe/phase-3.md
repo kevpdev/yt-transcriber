@@ -10,7 +10,8 @@ status: pending
 
 ```txt
 .
-└── (ruleset GitHub 24662094)  ✏️ contextes requis : check, security, e2e
+├── .github/workflows/trivy.yml  ✏️ `security-events: write` descend du niveau workflow au niveau job
+└── (ruleset GitHub 24662094)    ✏️ contextes requis : check, security, e2e
 ```
 
 ## User Journey
@@ -37,6 +38,12 @@ journey
 ```
 
 ## Tasks to do
+
+### `0)` Corriger `trivy.yml`
+
+> Le script de conformité relève une permission d'écriture en tête du workflow.
+
+1. Déplacer `security-events: write` sur le job `security`, garder `contents: read` en tête.
 
 ### `1)` Appliquer le ruleset
 
