@@ -1,6 +1,6 @@
 # Analyse : trois modes de sortie (texte, résumé, résumé illustré)
 
-- Date : 2026-10-09, révisée deux fois le même jour après arbitrage de l'utilisateur
+- Date : 2026-10-09, révisée trois fois le même jour après arbitrage de l'utilisateur
 - Statut : décision proposée, à figer en ADR avant toute implémentation
 - Portée : Q1 à Q6 du brief d'analyse, plus la question rouverte par l'utilisateur sur l'usage agentique. Hors périmètre : implémentation, UI détaillée, traduction (#14), file d'URLs (#12).
 
@@ -10,19 +10,19 @@ La chaîne a trois maillons, chacun avec une seule responsabilité :
 
 | Maillon | Responsabilité | Ce qu'il ne fait pas |
 |---|---|---|
-| yt-transcriber | transcription horodatée, avec ou sans images. Deux portes : la page pour l'utilisateur, l'API HTTP pour un agent | aucun LLM, aucune génération, ignore le vault |
+| yt-transcriber | transcription horodatée, avec ou sans images, gardée run par run en SQLite avec sa télémétrie. Deux portes : la page pour l'utilisateur, l'API HTTP pour un agent | aucun LLM, aucune génération, ignore le vault |
 | skill de transcription (`capture-video` réécrit) | pilote l'app et rend la transcription horodatée, plus les images si demandées | aucune note dans le vault |
 | skill de génération (nouveau) | cadre la demande en posant ses questions, appelle le skill de transcription, produit un HTML ou un PDF, puis propose une note d'index dans le vault | aucune transcription |
 
-La transcription horodatée est le prérequis de toute la chaîne : elle sert à l'utilisateur seule, et c'est elle qui permet de placer les images dans le document.
+Deux prérequis portent la chaîne. Le stockage des runs (#8) garde chaque résultat et le rend relisible par l'API. La transcription horodatée sert à l'utilisateur seule, et c'est elle qui permet de placer les images dans le document.
 
 Légende : **mesuré** (commande lancée ce jour), **doc** (doc officielle lue ce jour), **lu** (code ou fichier lu), **supposé** (non vérifié).
 
 ## Q1. Atomique ou découpé
 
-**Reco** : un job capture tout ce qu'il faut en une passe, au niveau choisi au lancement, « texte » ou « texte + images ». Le skill de transcription récupère le résultat dès la fin du job. La génération vient ensuite, sur ce que le skill a récupéré, sans rappeler l'app.
+**Reco** : un job capture tout ce qu'il faut en une passe, au niveau choisi au lancement, « texte » ou « texte + images ». À la fin, le résultat devient un run gardé en base. La génération vient ensuite et relit ce run par l'API, le dernier ou un run choisi, sans relancer de capture.
 
-**Critère qui a tranché** : le seul geste coûteux à refaire est le téléchargement de la vidéo. Les images doivent donc être extraites pendant le job ou jamais. Une fois le résultat récupéré par le skill, l'app n'a plus à le garder.
+**Critère qui a tranché** : le seul geste coûteux à refaire est le téléchargement de la vidéo. Les images doivent donc être extraites pendant le job ou jamais. Le reste se relit depuis la base autant de fois qu'il faut.
 
 **Alternative** : tout extraire à chaque job, images comprises. Rejetée parce que le mode 1 paierait le téléchargement vidéo pour rien.
 
@@ -38,7 +38,31 @@ Ce qui doit exister à la fin du job, par mode :
 
 Les segments horodatés existent déjà mais sont jetés : `Transcriber.run` lit `segment.end` pour la progression, puis ne garde que `segment.text` (**lu**, `app/transcribe.py`). Les garder est le prérequis. Le brief dit aujourd'hui « no timestamps », il faudra le corriger.
 
-**Durée de vie** : les jobs restent en mémoire, les 20 derniers gardés, comme aujourd'hui. Les images d'un job vivent dans un dossier du conteneur, supprimé quand le job sort des 20 derniers ou au redémarrage. Aucun volume : le skill a déjà tout récupéré. Écrire des images sur le disque du conteneur reste un écart léger à « Jobs live in memory only », à couvrir dans l'ADR des images.
+**Durée de vie** : chaque run est gardé, sans limite. Le job en cours reste en mémoire pour la progression, et devient un run en base à sa fin, réussi ou en erreur. Voir « Stockage des runs ».
+
+## Stockage des runs
+
+Question ajoutée par l'utilisateur : garder le résultat de chaque run, avec la télémétrie prévue par #8, pour qu'un skill relise le dernier run par l'API.
+
+**Reco** : SQLite, dans un fichier sur le volume nommé de #8. Les images restent des fichiers WebP sur ce volume, la base garde leur chemin.
+
+**Critère qui a tranché** : une base légère, sans service ni dépendance. SQLite est dans la bibliothèque standard de Python, et l'image embarque SQLite 3.46.1, qui exécute `jsonb()` et `json_extract()` (**mesuré**). Avec un seul job à la fois, il n'y a jamais d'écriture concurrente. Un run pèse quelques centaines de Ko de segments, donc 10 000 runs restent de l'ordre de quelques Go (supposé).
+
+**Alternative** : PostgreSQL et son `jsonb`. Rejetée parce qu'elle ajoute un service au Compose pour un seul utilisateur.
+
+| Table | Contenu | Forme |
+|---|---|---|
+| `runs` | une ligne par run : vidéo, état, erreur, langue, niveau de capture, temps | colonnes SQL |
+| `runs`, suite | réglages du modèle, machine, versions (télémétrie de #8) | colonnes JSONB, lues en bloc |
+| `segments` | `run_id`, `start`, `end`, `text` | une ligne par segment |
+| `frames` | `run_id`, horodatage, chemin du fichier | une ligne par image |
+
+- **Segments en lignes, pas en JSON** : la pagination est possible, et une recherche plein texte FTS5 sur tous les runs reste ouverte.
+- **Images en fichiers** : FastAPI les sert telles quelles, la base reste petite. L'alternative, des BLOB dans SQLite, donnerait un seul fichier à sauvegarder mais une base qui grossit vite.
+- **Accès** : module `sqlite3` de la bibliothèque standard, sans ORM, une écriture par run à la fin du job. Version du schéma suivie par `PRAGMA user_version`.
+- **Markdown** : une vue calculée à la demande depuis les segments, jamais stockée.
+
+API de lecture : `GET /runs`, `GET /runs/latest`, `GET /runs/{id}` (avec une vue Markdown à la demande), `GET /runs/{id}/frames/{fichier}`.
 
 ## Q2. WhisperX
 
@@ -138,25 +162,27 @@ Conséquence sur le GPU : l'utilisateur et un agent partagent le même job uniqu
 
 ## ADR à écrire
 
-1. **Capture des images sans ffmpeg** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV et numpy, plafond d'images, dossier d'images par job sur le disque du conteneur et sa durée de vie.
-2. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
+1. **Stockage des runs en SQLite** : remplace « Jobs live in memory only » pour les runs terminés, fixe le schéma, le volume, la rétention sans limite et les images en fichiers.
+2. **Capture des images sans ffmpeg** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV et numpy, plafond d'images.
+3. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
 
 La transcription horodatée ne demande pas d'ADR : elle ne s'écarte d'aucune décision de `stack.md`, seul le brief est à corriger.
 
 ## Issues à créer (titres seulement)
 
-- `feat(transcript): return a timestamped transcript`, prérequis, label `next`
+- `feat(transcript): return a timestamped transcript`, après #8
+- `feat(api): list runs and read the latest one`
 - `feat(frames): download the video-only stream and extract slide frames with PyAV`
 - `feat(jobs): choose the capture level, text or text with frames, at submit`
-- `feat(api): serve the frames of a finished job`
+- `feat(api): serve the frames of a run`
 - `docs(api): document the agent API contract`
 - `test(frames): calibrate change and duplicate thresholds on the reference video`
 
-À reprendre sur des issues existantes : réduire le périmètre de **#46**, fermer **#13**.
+À reprendre sur des issues existantes : **#8** passe du JSON Lines à SQLite et devient le socle, label `next`. Réduire le périmètre de **#46**, fermer **#13**.
 
 ## Captures hors contrat
 
 - Le flux vidéo seul évite la fusion, mais les formats `h264` 720p pèsent trois fois l'AV1 (111,6 Mo contre 38,2 Mo sur 15 min, **mesuré**). Le choix de format est à figer dans l'ADR des images.
 - La session citée (`agent-config`, `44a79299…`) proposait une chaîne avec ffmpeg, Groq et WeasyPrint sur un VPS. Ses prémisses (VPS sans GPU, ffmpeg) ne s'appliquent pas à ce dépôt.
 - Le nom `capture-video` ne dira plus ce que fait le skill réécrit. Le renommage se décide côté vault.
-- Réutiliser le résultat d'une vidéo déjà transcrite n'a plus de consommateur. À rouvrir si le même job est relancé souvent.
+- Réutiliser le résultat d'une vidéo déjà transcrite devient simple avec la base (chercher un run par identifiant de vidéo), mais n'a pas encore de consommateur. À rouvrir si le même job est relancé souvent.
