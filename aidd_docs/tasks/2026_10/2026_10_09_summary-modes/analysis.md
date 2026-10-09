@@ -86,11 +86,13 @@ API de lecture : `GET /runs`, `GET /runs/latest`, `GET /runs/{id}` (avec une vue
 
 ## Q3. Images (frames)
 
-**Reco** : télécharger le flux **vidéo seul** en 720p avec yt-dlp, à côté de l'audio actuel, puis tout faire avec PyAV et numpy, déjà dans l'image. Pas de ffmpeg.
+**Reco** : télécharger le flux **vidéo seul** en 720p avec yt-dlp, à côté de l'audio actuel, puis tout faire avec PyAV et numpy, déjà dans l'image. Pas de binaire `ffmpeg`.
 
-**Critère qui a tranché** : PyAV 18.1.0 de l'image décode `h264`, `vp9` et `av1`, et encode `png`, `mjpeg` et `libwebp` (**mesuré**). Prendre le flux vidéo seul évite la fusion audio-vidéo, qui est la seule étape où yt-dlp exige ffmpeg.
+**Critère qui a tranché** : FFmpeg est déjà dans l'image, sous forme des bibliothèques que PyAV embarque (`libavcodec` 62.28, `libavformat`, `libavfilter`, `libswscale`, **mesuré** par `av.library_versions`). Seul le binaire `ffmpeg` manque (**mesuré**, `which ffmpeg` vide). PyAV 18.1.0 décode `h264`, `vp9` et `av1`, et encode `png`, `mjpeg` et `libwebp` (**mesuré**). Prendre le flux vidéo seul évite la fusion audio-vidéo, qui est la seule étape où yt-dlp appelle le binaire.
 
-**Alternative** : ajouter ffmpeg et son filtre `select='gt(scene,…)'`. Rejetée parce qu'elle ajoute un binaire système pour une détection que numpy fait en quelques lignes.
+**Alternative** : installer le binaire `ffmpeg` par `apt`. Rejetée parce qu'elle ajoute un paquet système et une seconde version de FFmpeg à suivre, à côté de celle de PyAV, sans rien apporter que PyAV ne fasse.
+
+**Piste pour la détection** : `libavfilter` étant présent, le filtre de scène de FFmpeg (`select='gt(scene,0.3)'`) devrait tourner par un graphe de filtres PyAV, toujours sans binaire (supposé, non testé). À comparer avec la détection numpy lors du calibrage.
 
 La chaîne, en quatre étapes :
 
@@ -163,22 +165,22 @@ Conséquence sur le GPU : l'utilisateur et un agent partagent le même job uniqu
 ## ADR à écrire
 
 1. **Stockage des runs en SQLite** : remplace « Jobs live in memory only » pour les runs terminés, fixe le schéma, le volume, la rétention sans limite et les images en fichiers.
-2. **Capture des images sans ffmpeg** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV et numpy, plafond d'images.
+2. **Capture des images avec PyAV** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV (numpy ou `libavfilter`), plafond d'images, pas de binaire `ffmpeg`.
 3. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
 
 La transcription horodatée ne demande pas d'ADR : elle ne s'écarte d'aucune décision de `stack.md`, seul le brief est à corriger.
 
-## Issues à créer (titres seulement)
+## Issues créées
 
-- `feat(transcript): return a timestamped transcript`, après #8
-- `feat(api): list runs and read the latest one`
-- `feat(frames): download the video-only stream and extract slide frames with PyAV`
-- `feat(jobs): choose the capture level, text or text with frames, at submit`
-- `feat(api): serve the frames of a run`
-- `docs(api): document the agent API contract`
-- `test(frames): calibrate change and duplicate thresholds on the reference video`
+- #48 `feat(transcript): return a timestamped transcript`, après #8
+- #49 `feat(api): list runs and read the latest one`
+- #50 `feat(frames): download the video-only stream and extract slide frames with PyAV`
+- #51 `feat(jobs): choose the capture level, text or text with frames, at submit`
+- #52 `feat(api): serve the frames of a run`
+- #54 `docs(api): document the agent API contract`
+- #53 `test(frames): calibrate change and duplicate thresholds on the reference video`
 
-À reprendre sur des issues existantes : **#8** passe du JSON Lines à SQLite et devient le socle, label `next`. Réduire le périmètre de **#46**, fermer **#13**.
+Issues existantes : **#8** réécrite (SQLite, socle, label `next`), **#46** commentée (périmètre réduit à la transcription), **#13** fermée.
 
 ## Captures hors contrat
 
