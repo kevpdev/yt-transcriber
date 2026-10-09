@@ -1,20 +1,20 @@
 # Analyse : trois modes de sortie (texte, résumé, résumé illustré)
 
-- Date : 2026-10-09
+- Date : 2026-10-09, révisée le même jour après arbitrage de l'utilisateur
 - Statut : décision proposée, à figer en ADR avant toute implémentation
-- Portée : Q1 à Q6 du brief d'analyse. Hors périmètre : implémentation, UI détaillée, traduction (#14), file d'URLs (#12).
+- Portée : Q1 à Q6 du brief d'analyse, plus la question rouverte par l'utilisateur sur l'usage agentique. Hors périmètre : implémentation, UI détaillée, traduction (#14), file d'URLs (#12).
 
 ## Verdict
 
-L'app capture, une session Claude Code lancée par l'utilisateur rédige. Le job reste atomique sur la **capture** (texte horodaté, et images si demandées au lancement), et la **génération** du résumé est une étape séparée qui relit ce que le job a gardé. Aucun LLM ne tourne dans l'app, aucun identifiant d'abonnement n'y entre.
+L'app capture, les skills du vault consomment. yt-transcriber produit le texte horodaté et, si on le demande, les images d'une vidéo. Il a deux portes d'entrée : la page pour l'utilisateur, l'API HTTP pour un agent. Deux skills du vault s'appuient dessus : `capture-video`, qui en fait une note, et un nouveau skill de génération, qui en fait un document HTML ou PDF. Aucun LLM ne tourne dans l'app, aucun identifiant d'abonnement n'y entre.
 
 Légende : **mesuré** (commande lancée ce jour), **doc** (doc officielle lue ce jour), **lu** (code ou fichier lu), **supposé** (non vérifié).
 
 ## Q1. Atomique ou découpé
 
-**Reco** : le choix du niveau de capture se fait au lancement du job, avec deux niveaux, « texte » ou « texte + images ». Le résumé (modes 2 et 3) se génère ensuite, à la demande, à partir du résultat stocké. Rien n'est retéléchargé ni retranscrit.
+**Reco** : le niveau de capture se choisit au lancement du job, « texte » ou « texte + images ». La génération est une étape séparée, faite par un skill, qui relit le résultat stocké. Une seconde demande pour la même vidéo au même niveau rend le résultat déjà calculé, sans retélécharger ni retranscrire.
 
-**Critère qui a tranché** : le seul geste coûteux à refaire est le téléchargement de la vidéo, pas la transcription ni le résumé. Les images doivent donc être extraites pendant le job ou jamais. Le résumé, lui, ne dépend que de données légères.
+**Critère qui a tranché** : le seul geste coûteux à refaire est le téléchargement de la vidéo. Les images doivent donc être extraites pendant le job ou jamais. Le reste ne dépend que de données légères, réutilisables par plusieurs consommateurs.
 
 **Alternative** : tout extraire à chaque job, images comprises. Rejetée parce que le mode 1 paierait le téléchargement vidéo et le stockage pour rien.
 
@@ -28,11 +28,10 @@ Ce qui doit exister à la fin du job, par mode :
 | images retenues, avec leur horodatage | non | non | oui | quelques Mo pour 40 à 60 images WebP 720p (supposé) |
 | audio | jeté | jeté | jeté | inutile une fois transcrit |
 | vidéo | non téléchargée | non téléchargée | jetée après extraction | 38,2 Mo pour 15 min en AV1 720p (**mesuré**), donc environ 140 Mo pour 56 min (extrapolé) |
-| résumé Markdown | non | ajouté plus tard | ajouté plus tard | quelques Ko |
 
-Les segments horodatés existent déjà mais sont jetés : `Transcriber.run` lit `segment.end` pour la progression, puis ne garde que `segment.text` (**lu**, `app/transcribe.py`). Les garder ne coûte qu'un changement de type de retour.
+Les segments horodatés existent déjà mais sont jetés : `Transcriber.run` lit `segment.end` pour la progression, puis ne garde que `segment.text` (**lu**, `app/transcribe.py`). Les garder sert deux besoins : aligner les images sur le texte, et proposer à l'utilisateur une transcription horodatée, une fonctionnalité qu'il prévoyait sans l'avoir encore inscrite au backlog. Le brief dit aujourd'hui « no timestamps », il faudra le corriger.
 
-**Durée de vie** : un dossier par job sur un volume nommé, les 20 derniers gardés, comme aujourd'hui en mémoire. Persister sur disque est nécessaire parce que la session qui rédige le résumé passe après le job, parfois après un redémarrage. C'est un écart à « Jobs live in memory only » (`architecture.md`), donc un ADR. Avec 20 jobs illustrés, le volume reste sous 200 Mo (supposé, d'après les tailles ci-dessus).
+**Durée de vie** : un dossier par job sur un volume nommé, les 20 derniers gardés, comme aujourd'hui en mémoire. Persister sur disque est nécessaire parce que les skills passent après le job, parfois après un redémarrage. C'est un écart à « Jobs live in memory only » (`architecture.md`), donc un ADR. Avec 20 jobs illustrés, le volume reste sous 200 Mo (supposé, d'après les tailles ci-dessus).
 
 ## Q2. WhisperX
 
@@ -41,8 +40,6 @@ Les segments horodatés existent déjà mais sont jetés : `Transcriber.run` lit
 **Critère qui a tranché** : une slide reste affichée des dizaines de secondes, un segment Whisper dure quelques secondes (supposé, ordre de grandeur courant). La précision au mot de WhisperX n'apporte rien à un alignement à l'échelle de la slide. Si un jour il en faut, faster-whisper 1.2.1 expose déjà `word_timestamps` et un champ `words` sur `Segment` (**mesuré** dans l'image).
 
 **Alternative** : WhisperX pour la diarisation. Rejetée : la diarisation passe par pyannote, qui exige un jeton Hugging Face et l'acceptation d'une licence de modèle (**doc**, README WhisperX), donc un compte, ce que le brief exclut.
-
-Ce que WhisperX apporterait, et ce qu'il coûte :
 
 | Apport (**doc**) | Utile ici ? |
 |---|---|
@@ -69,71 +66,89 @@ La chaîne, en quatre étapes :
 1. **Obtenir** : format vidéo seul AV1 ou VP9 en 720p, 38,2 Mo à 61,1 Mo pour 15 min (**mesuré** sur `KnXm3PbNz5A`). Le 720p est supposé nécessaire pour lire le texte d'une slide.
 2. **Détecter les changements** : décoder environ une image par seconde, la réduire en niveaux de gris de petite taille, et comparer à la dernière image retenue par différence absolue moyenne. Ne retenir une image qu'une fois l'écran stable quelques secondes, pour écarter transitions et animations. Seuils supposés, à calibrer sur la vidéo de référence `gsxiFd8AZQU`.
 3. **Dédupliquer** : un hash perceptuel (dHash) par image retenue, comparé à **toutes** les images déjà gardées, pour attraper le retour à une slide déjà vue. Plafond dur sur le nombre d'images.
-4. **Juger la pertinence** : la part déterministe rattache chaque image aux segments compris entre son horodatage et celui de l'image suivante. La part sémantique revient au LLM qui rédige : il voit chaque image avec son texte et choisit lesquelles illustrent le résumé. Une vidéo « tête parlante » produit peu d'images stables, donc peu de candidates (supposé).
+4. **Juger la pertinence** : la part déterministe rattache chaque image aux segments compris entre son horodatage et celui de l'image suivante. La part sémantique revient au LLM du skill de génération : il voit chaque image avec son texte et choisit lesquelles illustrent le document. Une vidéo « tête parlante » produit peu d'images stables, donc peu de candidates (supposé).
 
-**Le skill `capture-video` ne couvre rien de cette chaîne** (**lu**). Il prend un transcript dont l'en-tête peut lister des chemins d'images, puis les copie dans `6 ATTACHMENTS/images/` sous une section « Captures d'écran ». Il ne télécharge, n'extrait, ni ne trie aucune image. Ce qu'il apporte, c'est la mise en note d'images déjà choisies.
+**Le skill `capture-video` ne couvre rien de cette chaîne** (**lu**). Il prend un transcript dont l'en-tête peut lister des chemins d'images, puis les copie dans `6 ATTACHMENTS/images/` sous une section « Captures d'écran ». Il ne télécharge, n'extrait, ni ne trie aucune image.
 
 ## Q4. Génération LLM via l'abonnement
 
-**Reco** : la génération se fait hors de l'app, dans une session Claude Code que l'utilisateur lance lui-même, par le skill du vault. La session lit le résultat du job par l'API (texte, segments, images), rédige le résumé, et le renvoie à l'app pour le PDF.
+**Reco** : la génération se fait hors de l'app, par un skill dédié du vault, dans une session que l'utilisateur lance lui-même avec l'agent de son choix. Le skill lit le résultat du job par l'API (texte, segments, images) et rédige le document.
 
 **Critère qui a tranché** : c'est le seul chemin qui reste dans « ordinary use of Claude Code » sans faire entrer d'identifiant d'abonnement dans l'app. La doc dit que l'authentification OAuth « *is designed to support ordinary use of Claude Code and other native Anthropic applications* », et que les développeurs de produits, Agent SDK compris, « *should use API key authentication* » (**doc**, page Legal and compliance). Claude Code 2.1.295 est installé sur l'hôte (**mesuré**), pas dans l'image.
 
-**Alternative** : un modèle local (Ollama), si le résumé doit partir d'un bouton de la page sans session. Elle respecte le brief, mais ajoute un service et partage les 16 Go de VRAM avec Whisper, avec une qualité de résumé et de lecture d'image en français non mesurée.
+**Alternative** : un modèle local (Ollama) appelé par l'app, si la génération doit partir d'un bouton de la page sans session. Elle respecte le brief, mais ajoute un service et partage les 16 Go de VRAM avec Whisper, avec une qualité non mesurée.
 
 | Option | Faisable ? | Écart au brief ou aux conditions |
 |---|---|---|
-| **session lancée par l'utilisateur, skill du vault** (reco) | oui : `claude -p` développe `/skill-name` dans le prompt et lit les images (**doc**, page headless) | aucun |
-| `claude -p` dans le conteneur, avec `CLAUDE_CODE_OAUTH_TOKEN` issu de `claude setup-token` | oui techniquement : jeton d'un an prévu « *for CI pipelines and scripts* » (**doc**, page Authentication) | zone grise : un identifiant d'abonnement stocké dans l'app, et un binaire Node ajouté à l'image. Le mode `--bare`, recommandé pour les scripts, ne lit pas ce jeton (**doc**) |
+| **skill du vault dans une session lancée par l'utilisateur** (reco) | oui : `claude -p` développe `/skill-name` dans le prompt et lit les images (**doc**, page headless) | aucun |
+| `claude -p` dans le conteneur, avec `CLAUDE_CODE_OAUTH_TOKEN` issu de `claude setup-token` | oui techniquement : jeton d'un an prévu « *for CI pipelines and scripts* » (**doc**, page Authentication) | zone grise : un identifiant d'abonnement stocké dans l'app, et un binaire ajouté à l'image. Le mode `--bare`, recommandé pour les scripts, ne lit pas ce jeton (**doc**) |
 | conteneur qui appelle le `claude` de l'hôte | non sans pont : le conteneur ne voit pas les binaires de l'hôte | un démon hôte à écrire et sécuriser |
 | API Anthropic avec clé | oui | **écart au brief** : service payant à l'usage |
 | modèle local | oui | aucun, mais qualité non mesurée |
 
-**Le prix de la reco**, à assumer : les modes 2 et 3 ne partent pas d'un bouton de la page seul. Ils partent de la session (`/capture-video <url>`), ou la page affiche la commande à lancer pour un job déjà terminé. Le quota de l'abonnement absorbe les images envoyées au modèle (supposé, coût non mesuré).
+**Le prix de la reco**, à assumer : les modes 2 et 3 ne partent pas d'un bouton de la page. Ils partent d'une session d'agent. Le quota de l'abonnement absorbe les images envoyées au modèle (supposé, coût non mesuré).
 
-## Q5. Skill `capture-video` ou app autonome
+## Q5. Skills du vault et autonomie de l'app
 
-**Reco** : l'app reste autonome pour la capture et ignore le vault. On modifie le skill pour qu'il pilote l'app et rédige le résumé. #13 fusionne dans #46, qui s'élargit.
+**Reco** : l'app reste autonome et ignore le vault. Deux skills consomment son API, chacun avec une seule responsabilité, et chacun appelle l'app directement :
 
-**Critère qui a tranché** : la question ouverte de #13, « le dépôt pousse, ou le skill vient chercher », est tranchée par Q4. Le skill vient chercher, puisque c'est lui qui porte la session LLM. #46 décrit déjà ce sens d'appel (`POST /jobs`, puis `GET /jobs/{id}`), il lui manque le résultat riche et le résumé.
+| Consommateur | Rôle | Ce qu'il lit dans le résultat |
+|---|---|---|
+| `capture-video` | URL vers une note du vault, texte reformulé | texte, métadonnées |
+| skill de génération (nouveau) | URL vers un document HTML ou PDF, illustré ou non | segments horodatés, images, métadonnées |
 
-**Alternative** : un nouveau skill dédié au résumé, à côté de `capture-video`. Rejetée tant que les deux font la même chose au départ, une URL YouTube vers une note.
+**Critère qui a tranché** : `capture-video` reformule le texte et ne garde pas les horodatages. Le skill de génération en a besoin pour placer les images, il ne peut donc pas partir de la note produite par `capture-video`. Les deux passent par l'app, qui rend le résultat déjà calculé pour une même vidéo : aucune double transcription, même si les deux skills tournent à la suite.
+
+**Alternative** : le skill de génération appelle `/capture-video` puis travaille sur sa note. Rejetée parce que la note a perdu les horodatages et l'association texte-image.
 
 Articulation des issues :
 
-- **#46** s'élargit : le skill lance le job au niveau voulu, lit le résultat, rédige le résumé (structure de la note `literature` existante), place les images retenues dans `6 ATTACHMENTS/`, et renvoie le résumé à l'app pour le PDF. Sa dépendance à #8 (télémétrie) se réduit aux métadonnées, qui arrivent avec le résultat persistant.
-- **#13** se ferme, avec un commentaire qui renvoie à #46.
-- Le travail côté vault se suit dans le vault, pas dans ce dépôt.
+- **#46** garde son objet : `capture-video` transcrit lui-même par l'app au lieu d'un outil en ligne. Sa dépendance à #8 (télémétrie) se réduit aux métadonnées, qui arrivent avec le résultat persistant.
+- **#13** se ferme : le passage de la transcription au skill est couvert par #46 et par le contrat d'API. Sa question ouverte, « le dépôt pousse, ou le skill vient chercher », est tranchée : le skill vient chercher.
+- Le skill de génération et les changements de `capture-video` se suivent dans le vault, pas dans ce dépôt.
 
-## Q6. PDF
+## Q6. Document de sortie, HTML ou PDF
 
-**Reco** : une page de rapport servie par FastAPI, avec une feuille de style `@media print`, et un bouton qui appelle `window.print()`. Le navigateur produit le PDF.
+**Reco** : le skill de génération produit d'abord un HTML autonome, images incluses, puis s'adapte aux outils de l'agent qui le pilote. Avec l'outil d'artefact de Claude, il publie le HTML en artefact. Sans lui, il écrit le fichier HTML en local. Le PDF se tire de ce HTML, par l'impression du navigateur ou par l'outil PDF de l'agent s'il en a un. L'app ne fait rien de cette étape.
 
-**Critère qui a tranché** : zéro dépendance ajoutée, et la stack reste celle de l'ADR (page HTML, JS vanilla, Tailwind via le CDN). Les images sont déjà servies par l'app.
+**Critère qui a tranché** : HTML est le seul format que tous les chemins savent produire et afficher, et un PDF s'en dérive. Le skill reste agnostique de l'agent, et l'app n'ajoute aucune dépendance.
 
-**Alternative** : WeasyPrint 70.0 côté serveur, si le PDF doit sortir sans navigateur (par exemple déposé par le skill). Il demande les bibliothèques système Pango dans l'image (supposé, d'après la doc d'installation connue, non relue ce jour). fpdf2 2.8.9 est pur Python mais tire Pillow, absent de l'image (**mesuré**), et ne rend pas de HTML riche.
+**Alternative** : générer le PDF dans l'app avec WeasyPrint 70.0, qui demande les bibliothèques système Pango dans l'image (supposé, non relu ce jour). Rejetée puisque la génération est sortie de l'app.
 
-Le rendu Markdown du résumé en HTML reste à choisir à l'ADR : côté page (une bibliothèque JS par CDN, cohérent avec Tailwind) ou côté serveur (un paquet pip). Non tranché ici, choix d'implémentation.
+## Usage agentique : API HTTP ou MCP
+
+Question rouverte par l'utilisateur après la première version : l'app doit servir aussi bien un humain qu'un agent.
+
+**Reco** : l'API HTTP d'abord, documentée comme un contrat pour agent. Un serveur MCP viendra seulement si un agent visé n'a pas de shell pour l'appeler.
+
+**Critère qui a tranché** : l'API existe déjà, et tout agent doté d'un shell l'appelle avec `curl`. Le skill reste ainsi agnostique sans couche de plus. Qu'aucun agent visé ne manque de shell est supposé, non vérifié.
+
+**Alternative** : un serveur MCP monté dans l'app, qui donnerait aux agents la découverte des outils et le retour des images en contenu natif. À reprendre si le premier agent sans shell apparaît.
+
+Conséquence sur le GPU : l'utilisateur et un agent partagent le même job unique. Le refus `409` deviendra plus fréquent, ce qui donne plus de poids à la file de #12.
 
 ## ADR à écrire
 
-1. **Persistance des résultats de job sur volume** : remplace « Jobs live in memory only », fixe le contenu d'un dossier de job et la rétention.
+1. **Persistance des résultats de job sur volume** : remplace « Jobs live in memory only », fixe le contenu d'un dossier de job, la réutilisation par vidéo et niveau, et la rétention.
 2. **Capture des images sans ffmpeg** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV et numpy, plafond d'images.
-3. **Résumé délégué à la session Claude Code de l'utilisateur** : aucun LLM ni identifiant dans l'app, contrat d'API avec le skill, PDF par impression navigateur.
+3. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
 
 ## Issues à créer (titres seulement)
 
 - `feat(jobs): keep timestamped segments and video metadata in the job result`
+- `feat(ui): show the transcript with timestamps`
 - `feat(storage): persist job results on a named volume, keep the last 20`
+- `feat(jobs): reuse the stored result of an already-transcribed video`
 - `feat(frames): download the video-only stream and extract slide frames with PyAV`
 - `feat(jobs): choose the capture level, text or text with frames, at submit`
 - `feat(api): expose a finished job's result, segments and frames included`
-- `feat(api): accept a summary for a job and serve a printable report page`
+- `docs(api): document the agent API contract`
 - `test(frames): calibrate change and duplicate thresholds on the reference video`
 
-À reprendre sur des issues existantes : élargir **#46**, fermer **#13** vers #46.
+À reprendre sur des issues existantes : préciser **#46**, fermer **#13**.
 
 ## Captures hors contrat
 
 - Le flux vidéo seul évite la fusion, mais les formats `h264` 720p pèsent trois fois l'AV1 (111,6 Mo contre 38,2 Mo sur 15 min, **mesuré**). Le choix de format est à figer dans l'ADR 2.
 - La session citée (`agent-config`, `44a79299…`) proposait une chaîne avec ffmpeg, Groq et WeasyPrint sur un VPS. Ses prémisses (VPS sans GPU, ffmpeg) ne s'appliquent pas à ce dépôt.
+- Le nom `capture-video` prête à confusion avec la génération. Le renommage éventuel se décide côté vault.
