@@ -1,37 +1,44 @@
 # Analyse : trois modes de sortie (texte, résumé, résumé illustré)
 
-- Date : 2026-10-09, révisée le même jour après arbitrage de l'utilisateur
+- Date : 2026-10-09, révisée deux fois le même jour après arbitrage de l'utilisateur
 - Statut : décision proposée, à figer en ADR avant toute implémentation
 - Portée : Q1 à Q6 du brief d'analyse, plus la question rouverte par l'utilisateur sur l'usage agentique. Hors périmètre : implémentation, UI détaillée, traduction (#14), file d'URLs (#12).
 
 ## Verdict
 
-L'app capture, les skills du vault consomment. yt-transcriber produit le texte horodaté et, si on le demande, les images d'une vidéo. Il a deux portes d'entrée : la page pour l'utilisateur, l'API HTTP pour un agent. Deux skills du vault s'appuient dessus : `capture-video`, qui en fait une note, et un nouveau skill de génération, qui en fait un document HTML ou PDF. Aucun LLM ne tourne dans l'app, aucun identifiant d'abonnement n'y entre.
+La chaîne a trois maillons, chacun avec une seule responsabilité :
+
+| Maillon | Responsabilité | Ce qu'il ne fait pas |
+|---|---|---|
+| yt-transcriber | transcription horodatée, avec ou sans images. Deux portes : la page pour l'utilisateur, l'API HTTP pour un agent | aucun LLM, aucune génération, ignore le vault |
+| skill de transcription (`capture-video` réécrit) | pilote l'app et rend la transcription horodatée, plus les images si demandées | aucune note dans le vault |
+| skill de génération (nouveau) | cadre la demande en posant ses questions, appelle le skill de transcription, produit un HTML ou un PDF, puis propose une note d'index dans le vault | aucune transcription |
+
+La transcription horodatée est le prérequis de toute la chaîne : elle sert à l'utilisateur seule, et c'est elle qui permet de placer les images dans le document.
 
 Légende : **mesuré** (commande lancée ce jour), **doc** (doc officielle lue ce jour), **lu** (code ou fichier lu), **supposé** (non vérifié).
 
 ## Q1. Atomique ou découpé
 
-**Reco** : le niveau de capture se choisit au lancement du job, « texte » ou « texte + images ». La génération est une étape séparée, faite par un skill, qui relit le résultat stocké. Une seconde demande pour la même vidéo au même niveau rend le résultat déjà calculé, sans retélécharger ni retranscrire.
+**Reco** : un job capture tout ce qu'il faut en une passe, au niveau choisi au lancement, « texte » ou « texte + images ». Le skill de transcription récupère le résultat dès la fin du job. La génération vient ensuite, sur ce que le skill a récupéré, sans rappeler l'app.
 
-**Critère qui a tranché** : le seul geste coûteux à refaire est le téléchargement de la vidéo. Les images doivent donc être extraites pendant le job ou jamais. Le reste ne dépend que de données légères, réutilisables par plusieurs consommateurs.
+**Critère qui a tranché** : le seul geste coûteux à refaire est le téléchargement de la vidéo. Les images doivent donc être extraites pendant le job ou jamais. Une fois le résultat récupéré par le skill, l'app n'a plus à le garder.
 
-**Alternative** : tout extraire à chaque job, images comprises. Rejetée parce que le mode 1 paierait le téléchargement vidéo et le stockage pour rien.
+**Alternative** : tout extraire à chaque job, images comprises. Rejetée parce que le mode 1 paierait le téléchargement vidéo pour rien.
 
 Ce qui doit exister à la fin du job, par mode :
 
 | Donnée | Mode 1 | Mode 2 | Mode 3 | Taille par vidéo de 56 min |
 |---|---|---|---|---|
-| texte brut | oui | oui | oui | environ 100 Ko (supposé, 14 097 mots mesurés dans l'ADR) |
-| segments `start`, `end`, `text` | oui | oui | oui | quelques centaines de Ko en JSON (supposé) |
-| métadonnées : titre, chaîne, durée, langue | oui | oui | oui | négligeable |
+| transcription horodatée, segments `start`, `end`, `text` | oui | oui | oui | quelques centaines de Ko en JSON (supposé, 14 097 mots mesurés dans l'ADR) |
+| métadonnées : titre, chaîne, durée, langue | oui | oui | oui | négligeable, porté par #10 |
 | images retenues, avec leur horodatage | non | non | oui | quelques Mo pour 40 à 60 images WebP 720p (supposé) |
 | audio | jeté | jeté | jeté | inutile une fois transcrit |
 | vidéo | non téléchargée | non téléchargée | jetée après extraction | 38,2 Mo pour 15 min en AV1 720p (**mesuré**), donc environ 140 Mo pour 56 min (extrapolé) |
 
-Les segments horodatés existent déjà mais sont jetés : `Transcriber.run` lit `segment.end` pour la progression, puis ne garde que `segment.text` (**lu**, `app/transcribe.py`). Les garder sert deux besoins : aligner les images sur le texte, et proposer à l'utilisateur une transcription horodatée, une fonctionnalité qu'il prévoyait sans l'avoir encore inscrite au backlog. Le brief dit aujourd'hui « no timestamps », il faudra le corriger.
+Les segments horodatés existent déjà mais sont jetés : `Transcriber.run` lit `segment.end` pour la progression, puis ne garde que `segment.text` (**lu**, `app/transcribe.py`). Les garder est le prérequis. Le brief dit aujourd'hui « no timestamps », il faudra le corriger.
 
-**Durée de vie** : un dossier par job sur un volume nommé, les 20 derniers gardés, comme aujourd'hui en mémoire. Persister sur disque est nécessaire parce que les skills passent après le job, parfois après un redémarrage. C'est un écart à « Jobs live in memory only » (`architecture.md`), donc un ADR. Avec 20 jobs illustrés, le volume reste sous 200 Mo (supposé, d'après les tailles ci-dessus).
+**Durée de vie** : les jobs restent en mémoire, les 20 derniers gardés, comme aujourd'hui. Les images d'un job vivent dans un dossier du conteneur, supprimé quand le job sort des 20 derniers ou au redémarrage. Aucun volume : le skill a déjà tout récupéré. Écrire des images sur le disque du conteneur reste un écart léger à « Jobs live in memory only », à couvrir dans l'ADR des images.
 
 ## Q2. WhisperX
 
@@ -72,7 +79,7 @@ La chaîne, en quatre étapes :
 
 ## Q4. Génération LLM via l'abonnement
 
-**Reco** : la génération se fait hors de l'app, par un skill dédié du vault, dans une session que l'utilisateur lance lui-même avec l'agent de son choix. Le skill lit le résultat du job par l'API (texte, segments, images) et rédige le document.
+**Reco** : la génération se fait hors de l'app, par un skill dédié du vault, dans une session que l'utilisateur lance lui-même avec l'agent de son choix. Il obtient la transcription horodatée et les images par le skill de transcription, qui appelle l'API, puis rédige le document.
 
 **Critère qui a tranché** : c'est le seul chemin qui reste dans « ordinary use of Claude Code » sans faire entrer d'identifiant d'abonnement dans l'app. La doc dit que l'authentification OAuth « *is designed to support ordinary use of Claude Code and other native Anthropic applications* », et que les développeurs de produits, Agent SDK compris, « *should use API key authentication* » (**doc**, page Legal and compliance). Claude Code 2.1.295 est installé sur l'hôte (**mesuré**), pas dans l'image.
 
@@ -88,24 +95,26 @@ La chaîne, en quatre étapes :
 
 **Le prix de la reco**, à assumer : les modes 2 et 3 ne partent pas d'un bouton de la page. Ils partent d'une session d'agent. Le quota de l'abonnement absorbe les images envoyées au modèle (supposé, coût non mesuré).
 
+
 ## Q5. Skills du vault et autonomie de l'app
 
-**Reco** : l'app reste autonome et ignore le vault. Deux skills consomment son API, chacun avec une seule responsabilité, et chacun appelle l'app directement :
+**Reco** : l'app reste autonome et ignore le vault. `capture-video` est réécrit pour ne faire que la transcription : il pilote l'app et rend la transcription horodatée, avec ou sans images. Le skill de génération l'appelle, puis fait le reste.
 
-| Consommateur | Rôle | Ce qu'il lit dans le résultat |
-|---|---|---|
-| `capture-video` | URL vers une note du vault, texte reformulé | texte, métadonnées |
-| skill de génération (nouveau) | URL vers un document HTML ou PDF, illustré ou non | segments horodatés, images, métadonnées |
+**Critère qui a tranché** : une responsabilité par maillon. La note du vault n'est plus un produit de la transcription, c'est un index du document généré, donc elle revient au skill de génération.
 
-**Critère qui a tranché** : `capture-video` reformule le texte et ne garde pas les horodatages. Le skill de génération en a besoin pour placer les images, il ne peut donc pas partir de la note produite par `capture-video`. Les deux passent par l'app, qui rend le résultat déjà calculé pour une même vidéo : aucune double transcription, même si les deux skills tournent à la suite.
+**Alternative** : le skill de génération appelle l'app directement, sans skill de transcription. Rejetée parce que la transcription sert aussi seule, et qu'un agent doit pouvoir la demander sans passer par la génération.
 
-**Alternative** : le skill de génération appelle `/capture-video` puis travaille sur sa note. Rejetée parce que la note a perdu les horodatages et l'association texte-image.
+Le skill de génération est interactif. Avant de produire, il pose ses questions de cadrage, avec l'outil de questions de l'agent s'il en a un, sinon en texte :
+
+1. format : HTML ou PDF ;
+2. avec ou sans images, ce qui fixe le niveau de capture demandé au skill de transcription ;
+3. après production, ajouter ou non au vault une note d'index qui pointe vers le document, avec une description brève.
 
 Articulation des issues :
 
-- **#46** garde son objet : `capture-video` transcrit lui-même par l'app au lieu d'un outil en ligne. Sa dépendance à #8 (télémétrie) se réduit aux métadonnées, qui arrivent avec le résultat persistant.
-- **#13** se ferme : le passage de la transcription au skill est couvert par #46 et par le contrat d'API. Sa question ouverte, « le dépôt pousse, ou le skill vient chercher », est tranchée : le skill vient chercher.
-- Le skill de génération et les changements de `capture-video` se suivent dans le vault, pas dans ce dépôt.
+- **#46** garde son objet, avec un périmètre réduit : `capture-video` transcrit par l'app, ne crée plus de note, et rend la transcription horodatée et les images. Sa dépendance à #8 (télémétrie) se réduit aux métadonnées, portées par #10.
+- **#13** se ferme : le passage de la transcription au résumé est couvert par #46 et par le contrat d'API. Sa question ouverte est tranchée : le skill vient chercher.
+- La réécriture de `capture-video` et le skill de génération se suivent dans le vault, pas dans ce dépôt. Où ranger le document généré dans le vault reste à trancher là-bas.
 
 ## Q6. Document de sortie, HTML ou PDF
 
@@ -129,26 +138,25 @@ Conséquence sur le GPU : l'utilisateur et un agent partagent le même job uniqu
 
 ## ADR à écrire
 
-1. **Persistance des résultats de job sur volume** : remplace « Jobs live in memory only », fixe le contenu d'un dossier de job, la réutilisation par vidéo et niveau, et la rétention.
-2. **Capture des images sans ffmpeg** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV et numpy, plafond d'images.
-3. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
+1. **Capture des images sans ffmpeg** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV et numpy, plafond d'images, dossier d'images par job sur le disque du conteneur et sa durée de vie.
+2. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
+
+La transcription horodatée ne demande pas d'ADR : elle ne s'écarte d'aucune décision de `stack.md`, seul le brief est à corriger.
 
 ## Issues à créer (titres seulement)
 
-- `feat(jobs): keep timestamped segments and video metadata in the job result`
-- `feat(ui): show the transcript with timestamps`
-- `feat(storage): persist job results on a named volume, keep the last 20`
-- `feat(jobs): reuse the stored result of an already-transcribed video`
+- `feat(transcript): return a timestamped transcript`, prérequis, label `next`
 - `feat(frames): download the video-only stream and extract slide frames with PyAV`
 - `feat(jobs): choose the capture level, text or text with frames, at submit`
-- `feat(api): expose a finished job's result, segments and frames included`
+- `feat(api): serve the frames of a finished job`
 - `docs(api): document the agent API contract`
 - `test(frames): calibrate change and duplicate thresholds on the reference video`
 
-À reprendre sur des issues existantes : préciser **#46**, fermer **#13**.
+À reprendre sur des issues existantes : réduire le périmètre de **#46**, fermer **#13**.
 
 ## Captures hors contrat
 
-- Le flux vidéo seul évite la fusion, mais les formats `h264` 720p pèsent trois fois l'AV1 (111,6 Mo contre 38,2 Mo sur 15 min, **mesuré**). Le choix de format est à figer dans l'ADR 2.
+- Le flux vidéo seul évite la fusion, mais les formats `h264` 720p pèsent trois fois l'AV1 (111,6 Mo contre 38,2 Mo sur 15 min, **mesuré**). Le choix de format est à figer dans l'ADR des images.
 - La session citée (`agent-config`, `44a79299…`) proposait une chaîne avec ffmpeg, Groq et WeasyPrint sur un VPS. Ses prémisses (VPS sans GPU, ffmpeg) ne s'appliquent pas à ce dépôt.
-- Le nom `capture-video` prête à confusion avec la génération. Le renommage éventuel se décide côté vault.
+- Le nom `capture-video` ne dira plus ce que fait le skill réécrit. Le renommage se décide côté vault.
+- Réutiliser le résultat d'une vidéo déjà transcrite n'a plus de consommateur. À rouvrir si le même job est relancé souvent.
