@@ -31,6 +31,13 @@ log = logging.getLogger(__name__)
 LEVELS = ("text", "frames")
 
 
+def with_frame_urls(run: dict) -> dict:
+    """Add the relative `url` that serves each image, next to its `path`."""
+    for frame in run["frames"]:
+        frame["url"] = f"/runs/{run['id']}/frames/{Path(frame['path']).name}"
+    return run
+
+
 class JobRequest(BaseModel):
     url: str = ""
     # Any type: a null or a number gets the French 422 below, not the pydantic one.
@@ -188,14 +195,23 @@ def create_app(
         run = runs.get_run(run_id) if run_id else None
         if run is None:
             return JSONResponse({"detail": "Aucun run réussi."}, status_code=404)
-        return run
+        return with_frame_urls(run)
 
     @app.get("/runs/{run_id}")
     def get_run(run_id: str):
         run = runs.get_run(run_id)
         if run is None:
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
-        return run
+        return with_frame_urls(run)
+
+    @app.get("/runs/{run_id}/frames/{name}")
+    def get_run_frame(run_id: str, name: str):
+        if not runs.query("SELECT 1 FROM runs WHERE id = ?", (run_id,)):
+            return JSONResponse({"detail": "Run inconnu."}, status_code=404)
+        file = runs.frame_file(run_id, name)
+        if file is None:
+            return JSONResponse({"detail": "Image inconnue."}, status_code=404)
+        return FileResponse(file, media_type="image/webp")
 
     @app.get("/runs/{run_id}/markdown")
     def get_run_markdown(run_id: str):

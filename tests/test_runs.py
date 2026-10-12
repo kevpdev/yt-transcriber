@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app import jobs as j
 from app import machine
 from app.audio import AudioError
+from app.fake import fake_capture
 from app.main import create_app
 from app.runs import _FRAMES_SCHEMA, _RUNS_SCHEMA, _SEGMENTS_SCHEMA, Frame, RunStore, to_markdown
 from app.transcribe import Segment, settings
@@ -388,3 +389,74 @@ def test_version_three_database_migrates_to_four_with_level_text(tmp_path):
     runs = RunStore(path)
     assert runs.query("PRAGMA user_version") == [(4,)]
     assert runs.query("SELECT id, level FROM runs") == [("old", "text")]
+
+
+def frames_client(tmp_path):
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    return client, job_id
+
+
+def test_run_frames_list_time_and_url_and_each_url_serves_the_file(tmp_path):
+    client, run_id = frames_client(tmp_path)
+    for run in (client.get(f"/runs/{run_id}").json(), client.get("/runs/latest").json()):
+        assert [f["time"] for f in run["frames"]] == [0.0, 5.0]
+        assert [f["url"] for f in run["frames"]] == [
+            f"/runs/{run_id}/frames/000{i}.webp" for i in (0, 1)
+        ]
+    for frame in run["frames"]:
+        resp = client.get(frame["url"])
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/webp"
+        assert resp.content == (tmp_path / frame["path"]).read_bytes()
+
+
+def test_unknown_frame_name_gives_404_in_french(tmp_path):
+    client, run_id = frames_client(tmp_path)
+    resp = client.get(f"/runs/{run_id}/frames/9999.webp")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Image inconnue."}
+
+
+@pytest.mark.parametrize("name", ["..%2Fruns.db", "..%2F..%2Fruns.db", "%2E%2E%2Fruns.db"])
+def test_traversal_name_serves_nothing(tmp_path, name):
+    client, run_id = frames_client(tmp_path)
+    assert (tmp_path / "runs.db").is_file()
+    resp = client.get(f"/runs/{run_id}/frames/{name}")
+    assert resp.status_code == 404
+    assert b"SQLite" not in resp.content
+
+
+def test_frame_of_unknown_run_gives_404_in_french(tmp_path):
+    client, _ = frames_client(tmp_path)
+    resp = client.get("/runs/inconnu/frames/0000.webp")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Run inconnu."}
+
+
+def test_deleted_frame_file_gives_404(tmp_path):
+    client, run_id = frames_client(tmp_path)
+    (tmp_path / "frames" / run_id / "0000.webp").unlink()
+    resp = client.get(f"/runs/{run_id}/frames/0000.webp")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Image inconnue."}
+
+
+def test_memory_store_serves_no_frame():
+    runs = RunStore(":memory:")
+    assert runs.frame_file("a", "0000.webp") is None
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
+    resp = client.get("/runs/a/frames/0000.webp")
+    assert resp.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "name", ["../runs.db", "../../runs.db", "runs.db", "frames/{id}/0000.webp"]
+)
+def test_frame_file_refuses_any_name_not_listed_for_the_run(tmp_path, name):
+    client, run_id = frames_client(tmp_path)
+    runs = RunStore(str(tmp_path / "runs.db"))
+    assert runs.frame_file(run_id, name.format(id=run_id)) is None
+    assert runs.frame_file(run_id, "0000.webp") == tmp_path / "frames" / run_id / "0000.webp"
