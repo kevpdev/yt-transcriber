@@ -9,7 +9,7 @@ The HTTP API surface: its style, the main resources, and the contracts.
 
 ## Resources
 
-- `POST /jobs` takes `{"url": "...", "level": "text"}` and returns `202 {"id"}`. `level` is optional: `text` (default) or `frames`, which also captures the slides. `422` for an invalid URL or an unknown level (`{"detail": "Le niveau doit être text ou frames."}`), `409` when a job is already running.
+- `POST /jobs` takes `{"url": "...", "level": "text"}` and returns `202 {"id"}`. `level` is optional: `text` (default, also for `null`) or `frames`, which also captures the slides. `422` for an invalid URL or an unknown level (`{"detail": "Le niveau doit être text ou frames."}`), `409` when a job is already running.
 - `GET /jobs/{id}` returns `{id, stage, progress, text, segments, error}`. `segments` is the list of `{start, end, text}` in seconds, empty until the job is `done`. `404` for an unknown id.
 - `GET /runs?limit=&offset=` lists the finished runs, newest first (`started_at`, then insertion order). `limit` is 1 to 100 (default 20), `offset` at least 0, otherwise `422`. Returns `{runs, total, limit, offset}`, each run a summary: `id, video_id, url, title, channel, video_duration, state, level, language, word_count, started_at, total_s`.
 - `GET /runs/latest` returns the most recent run with state `done` in full, `404 {"detail": "Aucun run réussi."}` when there is none.
