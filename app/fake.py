@@ -18,6 +18,8 @@ FAKE_TEXT = (
 )
 # Long enough to reload the page and cut the network during the job.
 FAKE_DURATION = 10.0
+# Long enough for the page, which polls every 2 s, to show the extracting stage.
+FAKE_CAPTURE_DELAY = 3.0
 _STEPS = 10
 _SENTENCES = FAKE_TEXT.split(". ")
 
@@ -46,6 +48,7 @@ def fake_segments() -> list[Segment]:
 
 def fake_capture(url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
     """Two synthetic WebP images, one per half of the fake video."""
+    time.sleep(FAKE_CAPTURE_DELAY)
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = []
     for position, shade in enumerate((60, 200)):

@@ -5,10 +5,11 @@ from dataclasses import dataclass, field
 
 from .transcribe import Segment
 
-QUEUED, DOWNLOADING, TRANSCRIBING, DONE, ERROR = (
+QUEUED, DOWNLOADING, TRANSCRIBING, EXTRACTING, DONE, ERROR = (
     "queued",
     "downloading",
     "transcribing",
+    "extracting",
     "done",
     "error",
 )
@@ -42,18 +43,16 @@ class Job:
 
 
 class JobStore:
-    def __init__(self, frames: bool = False) -> None:
-        # Provisional: issue #51 replaces this store-wide switch by a choice per job.
-        self._frames = frames
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, Job] = {}
         self._active: Job | None = None
 
-    def start(self) -> Job:
+    def start(self, frames: bool = False) -> Job:
         with self._lock:
             if self._active and self._active.stage not in _FINISHED:
                 raise JobBusy("Une transcription est déjà en cours, attends qu'elle se termine.")
-            job = Job(id=uuid.uuid4().hex, frames=self._frames)
+            job = Job(id=uuid.uuid4().hex, frames=frames)
             self._active = job
             self._jobs[job.id] = job
             while len(self._jobs) > _KEEP:

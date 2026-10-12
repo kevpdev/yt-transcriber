@@ -49,13 +49,17 @@
       </button>
     </header>
 
-    <form id="form" class="flex gap-2">
+    <form id="form" class="flex flex-wrap gap-2">
       <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"
              class="flex-1 rounded-lg bg-surface border border-border placeholder:text-muted px-3 py-2 outline-none focus:border-accent">
       <button id="go" type="submit"
               class="rounded-lg bg-action text-on-action px-4 py-2 font-medium hover:bg-action-hover disabled:opacity-50 disabled:cursor-not-allowed">
         Transcrire
       </button>
+      <label class="basis-full flex items-center gap-2 text-sm text-ink">
+        <input id="frames" type="checkbox" class="accent-action">
+        Capturer les images
+      </label>
     </form>
 
     <p id="status" class="mt-3 min-h-6 text-sm text-action"></p>

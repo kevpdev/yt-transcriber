@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .transcribe import Segment
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 log = logging.getLogger(__name__)
 
 
@@ -70,6 +70,8 @@ CREATE TABLE frames (
 )
 """
 
+_LEVEL_SCHEMA = "ALTER TABLE runs ADD COLUMN level TEXT NOT NULL DEFAULT 'text'"
+
 _COLUMNS = (
     "id",
     "video_id",
@@ -89,6 +91,7 @@ _COLUMNS = (
     "transcribe_s",
     "total_s",
     "speed_ratio",
+    "level",
 )
 _JSON_COLUMNS = ("settings", "machine", "versions")
 _SUMMARY_COLUMNS = (
@@ -99,6 +102,7 @@ _SUMMARY_COLUMNS = (
     "channel",
     "video_duration",
     "state",
+    "level",
     "language",
     "word_count",
     "started_at",
@@ -144,6 +148,8 @@ class RunStore:
             steps.append(_SEGMENTS_SCHEMA)
         if version < 3:
             steps.append(_FRAMES_SCHEMA)
+        if version < 4:
+            steps.append(_LEVEL_SCHEMA)
         script = ";\n".join(steps)
         self._db.executescript(
             f"BEGIN;\n{script};\nPRAGMA user_version = {SCHEMA_VERSION};\nCOMMIT;"
@@ -170,6 +176,7 @@ class RunStore:
         unknown = set(fields) - set(_COLUMNS)
         if unknown:
             raise TypeError(f"Unknown run columns: {sorted(unknown)}")
+        fields.setdefault("level", "text")
         values = [fields.get(c) for c in _COLUMNS]
         blobs = [json.dumps(v) for v in (settings, machine, versions)]
         names = ", ".join((*_COLUMNS, *_JSON_COLUMNS))
