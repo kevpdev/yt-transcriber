@@ -7,7 +7,7 @@ from app import jobs as j
 from app import machine
 from app.audio import AudioError
 from app.main import create_app
-from app.runs import _RUNS_SCHEMA, RunStore, to_markdown
+from app.runs import _RUNS_SCHEMA, _SEGMENTS_SCHEMA, Frame, RunStore, to_markdown
 from app.transcribe import Segment, settings
 from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 
@@ -70,15 +70,93 @@ def test_version_one_database_migrates_without_losing_runs(tmp_path):
     old.commit()
     old.close()
     runs = RunStore(path)
-    assert runs.query("PRAGMA user_version") == [(2,)]
+    assert runs.query("PRAGMA user_version") == [(3,)]
     assert runs.query("SELECT id FROM runs") == [("old",)]
     assert runs.query("SELECT COUNT(*) FROM segments") == [(0,)]
 
 
-def test_two_runs_migration_leaves_the_version_at_two(tmp_path):
+def test_version_two_database_migrates_to_three_keeping_runs_and_segments(tmp_path):
+    path = str(tmp_path / "runs.db")
+    old = sqlite3.connect(path)
+    old.execute(_RUNS_SCHEMA)
+    old.execute(_SEGMENTS_SCHEMA)
+    old.execute(
+        "INSERT INTO runs (id, video_id, url, state, started_at) "
+        "VALUES ('old', 'v', 'u', 'done', 'now')"
+    )
+    old.execute("INSERT INTO segments VALUES ('old', 0, 0.0, 1.0, 'salut')")
+    old.execute("PRAGMA user_version = 2")
+    old.commit()
+    old.close()
+    runs = RunStore(path)
+    assert runs.query("PRAGMA user_version") == [(3,)]
+    assert runs.query("SELECT id FROM runs") == [("old",)]
+    assert runs.query("SELECT text FROM segments") == [("salut",)]
+    assert runs.query("SELECT COUNT(*) FROM frames") == [(0,)]
+
+
+def test_frames_are_recorded_with_paths_relative_to_the_database_folder(tmp_path):
+    runs = RunStore(str(tmp_path / "runs.db"))
+    assert runs.frames_dir == tmp_path / "frames"
+    images = [
+        Frame(position=i, time=t, path=tmp_path / "frames" / "a" / f"{i:04d}.webp")
+        for i, t in enumerate((0.0, 12.5))
+    ]
+    runs.record(
+        id="a",
+        video_id="v",
+        url="u",
+        state="done",
+        started_at="now",
+        settings={},
+        machine={},
+        versions={},
+        frames=images,
+    )
+    run = runs.get_run("a")
+    assert run is not None
+    assert run["frames"] == [
+        {"position": 0, "time": 0.0, "path": "frames/a/0000.webp"},
+        {"position": 1, "time": 12.5, "path": "frames/a/0001.webp"},
+    ]
+
+
+def test_frame_outside_the_database_folder_is_dropped_and_the_run_kept(tmp_path, caplog):
+    runs = RunStore(str(tmp_path / "runs.db"))
+    images = [
+        Frame(position=0, time=0.0, path=tmp_path / "frames" / "a" / "0000.webp"),
+        Frame(position=1, time=5.0, path=tmp_path.parent / "elsewhere.webp"),
+    ]
+    runs.record(
+        id="a",
+        video_id="v",
+        url="u",
+        state="done",
+        started_at="now",
+        settings={},
+        machine={},
+        versions={},
+        frames=images,
+    )
+    run = runs.get_run("a")
+    assert run is not None
+    assert run["frames"] == [{"position": 0, "time": 0.0, "path": "frames/a/0000.webp"}]
+    assert "Dropped frame" in caplog.text
+
+
+def test_run_without_images_has_an_empty_frames_list():
+    runs = RunStore(":memory:")
+    assert runs.frames_dir is None
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(client, job_id)
+    assert client.get(f"/runs/{job_id}").json()["frames"] == []
+
+
+def test_two_runs_migration_leaves_the_version_at_three(tmp_path):
     path = str(tmp_path / "runs.db")
     RunStore(path)
-    assert RunStore(path).query("PRAGMA user_version") == [(2,)]
+    assert RunStore(path).query("PRAGMA user_version") == [(3,)]
 
 
 def test_failed_run_is_recorded_with_its_error_and_no_transcript():
@@ -137,13 +215,13 @@ def test_schema_is_created_once_in_a_file_database(tmp_path):
         versions={},
     )
     second = RunStore(path)
-    assert second.query("PRAGMA user_version") == [(2,)]
+    assert second.query("PRAGMA user_version") == [(3,)]
     assert second.query("SELECT COUNT(*) FROM runs") == [(1,)]
 
 
-def test_fresh_database_is_empty_at_version_two():
+def test_fresh_database_is_empty_at_version_three():
     runs = RunStore(":memory:")
-    assert runs.query("PRAGMA user_version") == [(2,)]
+    assert runs.query("PRAGMA user_version") == [(3,)]
     assert runs.query("SELECT COUNT(*) FROM runs") == [(0,)]
 
 

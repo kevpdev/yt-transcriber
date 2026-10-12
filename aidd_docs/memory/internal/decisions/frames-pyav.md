@@ -47,4 +47,11 @@ Les images sont écrites en WebP et rangées selon `run-storage.md`. Les seuils 
 - Le mode « texte » ne change pas, il ne télécharge jamais la vidéo.
 - Un job « texte + images » télécharge environ 140 Mo de plus pour 56 min (extrapolé des 38,2 Mo mesurés sur 15 min) et dure plus longtemps.
 - Les seuils sont des réglages à calibrer, pas des constantes acquises.
-- Si YouTube ne propose ni AV1 ni VP9 en 720p pour une vidéo, le repli reste à définir dans #50.
+- Si YouTube ne propose ni AV1 ni VP9 en 720p pour une vidéo, le format de repli est `bestvideo[height<=720]` (voir « Choix faits dans #50 »).
+
+## Choix faits dans #50
+
+Date : 2026-10-12.
+
+- **Échec de la capture** : le job reste `done`, sans images, et l'erreur est journalisée. Perdre une transcription réussie pour une image ratée coûte plus cher que de n'avoir pas d'images. Choix supposé : #51 pourra décider de l'afficher à l'utilisateur.
+- **Format de repli** : après AV1 puis VP9, le sélecteur de yt-dlp prend `bestvideo[height<=720]`, quel que soit le codec (`h264` compris, PyAV le décode).

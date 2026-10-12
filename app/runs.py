@@ -1,14 +1,27 @@
 """One SQLite row per finished run, schema versioned by PRAGMA user_version."""
 
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from .transcribe import Segment
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class Frame:
+    """One captured slide: its position, its start in the video (seconds) and its file."""
+
+    position: int
+    time: float
+    path: Path
+
 
 _RUNS_SCHEMA = """
 CREATE TABLE runs (
@@ -43,6 +56,16 @@ CREATE TABLE segments (
     start REAL NOT NULL,
     end REAL NOT NULL,
     text TEXT NOT NULL,
+    PRIMARY KEY (run_id, position)
+)
+"""
+
+_FRAMES_SCHEMA = """
+CREATE TABLE frames (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    position INTEGER NOT NULL,
+    time REAL NOT NULL,
+    path TEXT NOT NULL,
     PRIMARY KEY (run_id, position)
 )
 """
@@ -101,6 +124,8 @@ class RunStore:
     def __init__(self, path: str) -> None:
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+        # Frame paths in the table are relative to the folder of the database file.
+        self._root = None if path == ":memory:" else Path(path).parent
         self._lock = threading.Lock()
         self._db = sqlite3.connect(path, check_same_thread=False)
         with self._lock:
@@ -117,10 +142,20 @@ class RunStore:
             steps.append(_RUNS_SCHEMA)
         if version < 2:
             steps.append(_SEGMENTS_SCHEMA)
+        if version < 3:
+            steps.append(_FRAMES_SCHEMA)
         script = ";\n".join(steps)
         self._db.executescript(
             f"BEGIN;\n{script};\nPRAGMA user_version = {SCHEMA_VERSION};\nCOMMIT;"
         )
+
+    @property
+    def frames_dir(self) -> Path | None:
+        """Where the images of the runs go, next to the database file. None for `:memory:`."""
+        return self._root / "frames" if self._root else None
+
+    def _relative(self, path: Path) -> str:
+        return path.relative_to(self._root).as_posix() if self._root else path.as_posix()
 
     def record(
         self,
@@ -129,6 +164,7 @@ class RunStore:
         machine: dict,
         versions: dict,
         segments: Sequence[Segment] = (),
+        frames: Sequence[Frame] = (),
         **fields,
     ) -> None:
         unknown = set(fields) - set(_COLUMNS)
@@ -138,11 +174,22 @@ class RunStore:
         blobs = [json.dumps(v) for v in (settings, machine, versions)]
         names = ", ".join((*_COLUMNS, *_JSON_COLUMNS))
         marks = ", ".join(["?"] * (len(_COLUMNS) + len(_JSON_COLUMNS)))
+        # An image outside the database folder is dropped, never the run with its transcript.
+        frame_rows = []
+        for f in frames:
+            try:
+                frame_rows.append((fields.get("id"), f.position, f.time, self._relative(f.path)))
+            except ValueError:
+                log.warning("Dropped frame %s of run %s: outside the folder", f.path, fields["id"])
         with self._lock, self._db:
             self._db.execute(f"INSERT INTO runs ({names}) VALUES ({marks})", [*values, *blobs])
             self._db.executemany(
                 "INSERT INTO segments (run_id, position, start, end, text) VALUES (?, ?, ?, ?, ?)",
                 [(fields.get("id"), i, s.start, s.end, s.text) for i, s in enumerate(segments)],
+            )
+            self._db.executemany(
+                "INSERT INTO frames (run_id, position, time, path) VALUES (?, ?, ?, ?)",
+                frame_rows,
             )
 
     def count(self) -> int:
@@ -178,10 +225,15 @@ class RunStore:
                 "SELECT start, end, text FROM segments WHERE run_id = ? ORDER BY position",
                 (run_id,),
             ).fetchall()
+            imgs = self._db.execute(
+                "SELECT position, time, path FROM frames WHERE run_id = ? ORDER BY position",
+                (run_id,),
+            ).fetchall()
         run: dict = dict(zip(names, row, strict=True))
         for col in _JSON_COLUMNS:
             run[col] = json.loads(run[col]) if run[col] is not None else None
         run["segments"] = [{"start": a, "end": b, "text": t} for a, b, t in segs]
+        run["frames"] = [{"position": p, "time": t, "path": f} for p, t, f in imgs]
         return run
 
     def query(self, sql: str, params: tuple = ()) -> list[tuple]:

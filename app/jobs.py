@@ -28,6 +28,7 @@ class Job:
     text: str = ""
     segments: list[Segment] = field(default_factory=list)
     error: str = ""
+    frames: bool = False
 
     def view(self) -> dict:
         return {
@@ -41,7 +42,9 @@ class Job:
 
 
 class JobStore:
-    def __init__(self) -> None:
+    def __init__(self, frames: bool = False) -> None:
+        # Provisional: issue #51 replaces this store-wide switch by a choice per job.
+        self._frames = frames
         self._lock = threading.Lock()
         self._jobs: dict[str, Job] = {}
         self._active: Job | None = None
@@ -50,7 +53,7 @@ class JobStore:
         with self._lock:
             if self._active and self._active.stage not in _FINISHED:
                 raise JobBusy("Une transcription est déjà en cours, attends qu'elle se termine.")
-            job = Job(id=uuid.uuid4().hex)
+            job = Job(id=uuid.uuid4().hex, frames=self._frames)
             self._active = job
             self._jobs[job.id] = job
             while len(self._jobs) > _KEEP:

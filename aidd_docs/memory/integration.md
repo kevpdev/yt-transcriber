@@ -5,7 +5,7 @@ project, this one included, lives in the ecosystem memory.
 
 ## External services
 
-- **YouTube**, through `yt-dlp` in `app/audio.py`. Only the audio is fetched (`bestaudio`, no playlist).
+- **YouTube**, through `yt-dlp` in `app/audio.py`. The audio is fetched (`bestaudio`, no playlist). When a job captures frames, `app/frames.py` also fetches the video stream alone, 720p at most, AV1 then VP9, never merged so no ffmpeg binary, and deletes it after the extraction.
 - **Hugging Face Hub**, which serves the `large-v3-turbo` model. It is downloaded at the first start into the `hf-cache` volume (`HF_HOME=/hf`) and reused after.
 - **jsDelivr CDN**, which serves Tailwind to the page. Without internet the page loads unstyled.
 

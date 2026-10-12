@@ -1187,6 +1187,7 @@ dependencies = [
     { name = "deno" },
     { name = "fastapi" },
     { name = "faster-whisper" },
+    { name = "numpy" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "yt-dlp" },
 ]
@@ -1210,6 +1211,7 @@ requires-dist = [
     { name = "deno" },
     { name = "fastapi" },
     { name = "faster-whisper", specifier = "==1.2.1" },
+    { name = "numpy" },
     { name = "uvicorn", extras = ["standard"] },
     { name = "yt-dlp" },
 ]

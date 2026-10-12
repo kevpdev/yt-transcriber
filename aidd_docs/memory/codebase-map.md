@@ -10,11 +10,13 @@ flowchart TD
     main --> transcribe["app/transcribe.py"]
     main --> runs["app/runs.py"]
     main --> machine["app/machine.py"]
+    main --> frames["app/frames.py"]
+    frames --> runs
 ```
 
 ## Areas
 
-- `app/`: the backend. `main.py` wires the routes, `urls.py` validates the YouTube URL, `jobs.py` holds the job state, `audio.py` downloads, `transcribe.py` runs Whisper, `runs.py` writes each finished run to SQLite, reads them back and renders the Markdown view, `machine.py` reads the machine and the versions once at startup, `fake.py` holds the fake transcriber and downloader used when `YT_FAKE=1`.
+- `app/`: the backend. `main.py` wires the routes, `urls.py` validates the YouTube URL, `jobs.py` holds the job state, `audio.py` downloads, `transcribe.py` runs Whisper, `runs.py` writes each finished run to SQLite, reads them back and renders the Markdown view, `frames.py` captures the slides of a video (also run by hand with `python -m app.frames <url> [out_dir]`), `machine.py` reads the machine and the versions once at startup, `fake.py` holds the fake transcriber, downloader and frame capture used when `YT_FAKE=1`.
 - `app/static/`: the page, served at `/` and `/static`. `index.html` holds the markup, the Tailwind directives and the theme script of the `<head>`, `theme.css` the theme variables, `app.js` the transcription and the theme button.
 - `tests/`: pytest suites for the job flow, the run storage, the URL parsing, the fake mode and the static files, run by `scripts/check.sh`.
 - `e2e/`: Playwright scenarios for the page, run by `scripts/e2e.sh fake|real`, outside `scripts/check.sh`.

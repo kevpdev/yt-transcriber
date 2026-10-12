@@ -13,7 +13,7 @@ The HTTP API surface: its style, the main resources, and the contracts.
 - `GET /jobs/{id}` returns `{id, stage, progress, text, segments, error}`. `segments` is the list of `{start, end, text}` in seconds, empty until the job is `done`. `404` for an unknown id.
 - `GET /runs?limit=&offset=` lists the finished runs, newest first (`started_at`, then insertion order). `limit` is 1 to 100 (default 20), `offset` at least 0, otherwise `422`. Returns `{runs, total, limit, offset}`, each run a summary: `id, video_id, url, title, channel, video_duration, state, language, word_count, started_at, total_s`.
 - `GET /runs/latest` returns the most recent run with state `done` in full, `404 {"detail": "Aucun run réussi."}` when there is none.
-- `GET /runs/{id}` returns every column of the run, with `settings`, `machine` and `versions` as objects and `segments` as `{start, end, text}`. `404 {"detail": "Run inconnu."}` for an unknown id.
+- `GET /runs/{id}` returns every column of the run, with `settings`, `machine` and `versions` as objects, `segments` as `{start, end, text}` and `frames` as `{position, time, path}` (empty without capture, `path` relative to the database folder, no route serves the files before #52). `404 {"detail": "Run inconnu."}` for an unknown id.
 - `GET /runs/{id}/markdown` returns `text/markdown; charset=utf-8`: `# <title or video_id>`, then one `[mm:ss] text` line per segment (`[h:mm:ss]` from one hour). Same `404`.
 - `GET /` serves the page.
 - `GET /static/{file}` serves the CSS and JS of the page. `404 {"detail"}` for an unknown file.
