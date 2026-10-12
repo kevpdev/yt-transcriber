@@ -18,7 +18,7 @@ Avec un seul job à la fois, il n'y a jamais d'écriture concurrente. L'outil se
 
 ## Décision
 
-Chaque run terminé, réussi ou en erreur, est écrit dans une base SQLite, un fichier sur un volume Docker nommé. Les images restent des fichiers WebP sur ce volume, et la base garde leur chemin. Le job en cours reste en mémoire pour la progression.
+Chaque run terminé, réussi ou en erreur, est écrit dans une base SQLite, un fichier du dossier `data/` du repo, monté sur `/data`, que l'utilisateur ouvre en direct dans un GUI comme DBeaver. Les images restent des fichiers WebP dans ce dossier, et la base garde leur chemin. Le job en cours reste en mémoire pour la progression.
 
 | Table | Contenu | Forme |
 |---|---|---|
@@ -38,6 +38,7 @@ SQLite 3.46.1 est dans l'image et exécute `jsonb()` et `json_extract()`, mesur�
 
 ## Alternatives
 
+- **Volume Docker nommé** : choisi d'abord, puis écarté le 2026-10-12. Il range le fichier sous `/var/lib/docker/volumes/`, réservé à root, donc un GUI de l'hôte ne l'ouvre que par une copie figée.
 - **PostgreSQL et son `jsonb`** : ajoute un service au Compose pour un seul utilisateur.
 - **Images en BLOB dans SQLite** : un seul fichier à sauvegarder, mais une base qui grossit vite, et FastAPI ne peut plus servir les images telles quelles.
 - **Segments en un champ JSON par run** : plus simple à écrire, mais ni pagination ni recherche plein texte.
@@ -51,6 +52,7 @@ SQLite 3.46.1 est dans l'image et exécute `jsonb()` et `json_extract()`, mesur�
 
 - L'historique survit à `docker compose down` puis `up`.
 - Un agent relit un run passé par l'API, sans GPU et sans téléchargement.
-- Le volume grossit sans limite. Une purge sera à décider si la taille gêne.
+- Le dossier `data/` grossit sans limite. Une purge sera à décider si la taille gêne.
 - Chaque évolution du schéma demande une migration, repérée par `PRAGMA user_version`.
+- Le conteneur tourne en root : `data/runs.db` appartient à root, lisible par l'utilisateur, pas modifiable sans `sudo`.
 - Retrouver un run par identifiant de vidéo devient possible, sans consommateur pour l'instant.

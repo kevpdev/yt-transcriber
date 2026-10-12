@@ -38,4 +38,4 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 - Entry: `http://localhost:8000`, started with `docker compose up --build`.
 - Auth: none.
-- State: no fixtures. Jobs live in memory, `docker compose restart` resets them. Finished runs stay in the `runs-data` volume, `docker compose down -v` deletes them.
+- State: no fixtures. Jobs live in memory, `docker compose restart` resets them. Finished runs stay in `data/runs.db`, `sudo rm -r data` deletes them.

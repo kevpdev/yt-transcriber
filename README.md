@@ -31,7 +31,9 @@ Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
 
 ## Historique des runs
 
-Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `/data/runs.db`, sur le volume nommé `runs-data`. La ligne garde la vidéo (identifiant, titre, chaîne, durée), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. `docker compose down` garde l'historique, `docker compose down -v` l'efface.
+Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `data/runs.db` dans le repo (monté sur `/data` dans le conteneur). La ligne garde la vidéo (identifiant, titre, chaîne, durée), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. `docker compose down` et `down -v` gardent l'historique, il s'efface avec `sudo rm -r data` (le fichier appartient à root).
+
+Pour le suivre en direct dans un GUI, ouvre `data/runs.db` en lecture seule, par exemple dans DBeaver (connexion SQLite) ou DB Browser for SQLite. Les colonnes `settings`, `machine` et `versions` sont en JSONB : `SELECT json(machine) FROM runs` les rend lisibles.
 
 Pour passer la version de Docker : `HOST_DOCKER_VERSION=$(docker version -f '{{.Server.Version}}') docker compose up --build`.
 
