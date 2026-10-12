@@ -128,10 +128,8 @@ def test_unknown_job_is_404():
 
 def test_job_with_frames_records_one_row_per_file_on_disk(tmp_path):
     runs = RunStore(str(tmp_path / "runs.db"))
-    client = TestClient(
-        create_app(FakeTranscriber(), fake_download, runs, fake_capture, j.JobStore(frames=True))
-    )
-    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
     assert wait_for(client, job_id)["stage"] == j.DONE
     frames = client.get(f"/runs/{job_id}").json()["frames"]
     assert [f["position"] for f in frames] == [0, 1]
@@ -158,10 +156,8 @@ def test_failed_capture_leaves_the_job_done_without_images(tmp_path, caplog):
         raise RuntimeError("decode failed")
 
     runs = RunStore(str(tmp_path / "runs.db"))
-    client = TestClient(
-        create_app(FakeTranscriber(), fake_download, runs, capture, j.JobStore(frames=True))
-    )
-    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
     body = wait_for(client, job_id)
     assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
     run = client.get(f"/runs/{job_id}").json()
@@ -176,10 +172,65 @@ def test_record_failure_after_capture_removes_the_images(tmp_path, monkeypatch, 
 
     runs = RunStore(str(tmp_path / "runs.db"))
     monkeypatch.setattr(runs, "record", refuse)
-    client = TestClient(
-        create_app(FakeTranscriber(), fake_download, runs, fake_capture, j.JobStore(frames=True))
-    )
-    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
     assert wait_for(client, job_id)["stage"] == j.DONE
     assert "Could not record run" in caplog.text
     assert not (tmp_path / "frames" / job_id).exists()
+
+
+def spy_stages(monkeypatch):
+    stages = []
+    set_stage = j.JobStore.set_stage
+
+    def spy(self, job, stage, progress=0.0):
+        stages.append(stage)
+        set_stage(self, job, stage, progress)
+
+    monkeypatch.setattr(j.JobStore, "set_stage", spy)
+    return stages
+
+
+@pytest.mark.parametrize("body", [{"url": URL}, {"url": URL, "level": None}])
+def test_job_without_level_never_extracts_and_records_level_text(body, tmp_path, monkeypatch):
+    stages = spy_stages(monkeypatch)
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
+    job_id = client.post("/jobs", json=body).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    assert j.EXTRACTING not in stages
+    run = client.get(f"/runs/{job_id}").json()
+    assert run["level"] == "text" and run["frames"] == []
+
+
+def test_job_with_frames_level_passes_through_extracting_and_records_it(tmp_path, monkeypatch):
+    stages = spy_stages(monkeypatch)
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    assert stages == [j.DOWNLOADING, j.TRANSCRIBING, j.EXTRACTING]
+    run = client.get(f"/runs/{job_id}").json()
+    assert run["level"] == "frames" and len(run["frames"]) == 2
+
+
+def test_unknown_level_gives_422_in_french_and_takes_no_job():
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    resp = client.post("/jobs", json={"url": URL, "level": "video"})
+    assert resp.status_code == 422
+    assert resp.json() == {"detail": "Le niveau doit être text ou frames."}
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
+@pytest.mark.parametrize("level", [1, ["frames"], ""])
+def test_non_string_or_empty_level_gives_the_french_422(level):
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    resp = client.post("/jobs", json={"url": URL, "level": level})
+    assert resp.status_code == 422
+    assert resp.json() == {"detail": "Le niveau doit être text ou frames."}
+
+
+def test_runs_list_carries_the_level_of_each_run():
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
+    assert [r["level"] for r in client.get("/runs").json()["runs"]] == ["text"]

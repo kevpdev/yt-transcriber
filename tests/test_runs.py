@@ -7,7 +7,7 @@ from app import jobs as j
 from app import machine
 from app.audio import AudioError
 from app.main import create_app
-from app.runs import _RUNS_SCHEMA, _SEGMENTS_SCHEMA, Frame, RunStore, to_markdown
+from app.runs import _FRAMES_SCHEMA, _RUNS_SCHEMA, _SEGMENTS_SCHEMA, Frame, RunStore, to_markdown
 from app.transcribe import Segment, settings
 from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 
@@ -70,12 +70,12 @@ def test_version_one_database_migrates_without_losing_runs(tmp_path):
     old.commit()
     old.close()
     runs = RunStore(path)
-    assert runs.query("PRAGMA user_version") == [(3,)]
+    assert runs.query("PRAGMA user_version") == [(4,)]
     assert runs.query("SELECT id FROM runs") == [("old",)]
     assert runs.query("SELECT COUNT(*) FROM segments") == [(0,)]
 
 
-def test_version_two_database_migrates_to_three_keeping_runs_and_segments(tmp_path):
+def test_version_two_database_migrates_to_four_keeping_runs_and_segments(tmp_path):
     path = str(tmp_path / "runs.db")
     old = sqlite3.connect(path)
     old.execute(_RUNS_SCHEMA)
@@ -89,7 +89,7 @@ def test_version_two_database_migrates_to_three_keeping_runs_and_segments(tmp_pa
     old.commit()
     old.close()
     runs = RunStore(path)
-    assert runs.query("PRAGMA user_version") == [(3,)]
+    assert runs.query("PRAGMA user_version") == [(4,)]
     assert runs.query("SELECT id FROM runs") == [("old",)]
     assert runs.query("SELECT text FROM segments") == [("salut",)]
     assert runs.query("SELECT COUNT(*) FROM frames") == [(0,)]
@@ -153,10 +153,10 @@ def test_run_without_images_has_an_empty_frames_list():
     assert client.get(f"/runs/{job_id}").json()["frames"] == []
 
 
-def test_two_runs_migration_leaves_the_version_at_three(tmp_path):
+def test_two_runs_migration_leaves_the_version_at_four(tmp_path):
     path = str(tmp_path / "runs.db")
     RunStore(path)
-    assert RunStore(path).query("PRAGMA user_version") == [(3,)]
+    assert RunStore(path).query("PRAGMA user_version") == [(4,)]
 
 
 def test_failed_run_is_recorded_with_its_error_and_no_transcript():
@@ -215,13 +215,13 @@ def test_schema_is_created_once_in_a_file_database(tmp_path):
         versions={},
     )
     second = RunStore(path)
-    assert second.query("PRAGMA user_version") == [(3,)]
+    assert second.query("PRAGMA user_version") == [(4,)]
     assert second.query("SELECT COUNT(*) FROM runs") == [(1,)]
 
 
-def test_fresh_database_is_empty_at_version_three():
+def test_fresh_database_is_empty_at_version_four():
     runs = RunStore(":memory:")
-    assert runs.query("PRAGMA user_version") == [(3,)]
+    assert runs.query("PRAGMA user_version") == [(4,)]
     assert runs.query("SELECT COUNT(*) FROM runs") == [(0,)]
 
 
@@ -370,3 +370,21 @@ def test_runs_list_rejects_invalid_pagination_with_422(query):
     response = client.get(f"/runs?{query}")
     assert response.status_code == 422
     assert "entier" in response.json()["detail"]
+
+
+def test_version_three_database_migrates_to_four_with_level_text(tmp_path):
+    path = str(tmp_path / "runs.db")
+    old = sqlite3.connect(path)
+    old.execute(_RUNS_SCHEMA)
+    old.execute(_SEGMENTS_SCHEMA)
+    old.execute(_FRAMES_SCHEMA)
+    old.execute(
+        "INSERT INTO runs (id, video_id, url, state, started_at) "
+        "VALUES ('old', 'v', 'u', 'done', 'now')"
+    )
+    old.execute("PRAGMA user_version = 3")
+    old.commit()
+    old.close()
+    runs = RunStore(path)
+    assert runs.query("PRAGMA user_version") == [(4,)]
+    assert runs.query("SELECT id, level FROM runs") == [("old", "text")]

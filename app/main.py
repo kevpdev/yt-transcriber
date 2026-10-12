@@ -8,6 +8,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -27,8 +28,13 @@ STATIC = Path(__file__).parent / "static"
 log = logging.getLogger(__name__)
 
 
+LEVELS = ("text", "frames")
+
+
 class JobRequest(BaseModel):
     url: str = ""
+    # Any type: a null or a number gets the French 422 below, not the pydantic one.
+    level: Any = None
 
 
 def create_app(
@@ -36,10 +42,9 @@ def create_app(
     download=download_audio,
     runs: RunStore | None = None,
     capture=capture_frames,
-    jobs: j.JobStore | None = None,
 ) -> FastAPI:
     transcriber = transcriber or Transcriber()
-    store = jobs or j.JobStore()
+    store = j.JobStore()
     runs = runs or RunStore(":memory:")
     env: dict = {}
 
@@ -77,8 +82,10 @@ def create_app(
                 store.set_stage(job, j.TRANSCRIBING)
                 result = transcriber.run(meta.path, lambda p: store.set_progress(job, p))
                 t_transcribe = time.monotonic() - t0 - t_download
-                if job.frames and runs.frames_dir:
-                    images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
+                if job.frames:
+                    store.set_stage(job, j.EXTRACTING)
+                    if runs.frames_dir:
+                        images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
         except AudioError as exc:
             error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
@@ -94,6 +101,7 @@ def create_app(
                 title=meta.title if meta else None,
                 channel=meta.channel if meta else None,
                 video_duration=meta.duration if meta else None,
+                level="frames" if job.frames else "text",
                 state=j.DONE if done else j.ERROR,
                 error=error,
                 text=result.text if done and result else None,
@@ -129,8 +137,13 @@ def create_app(
             video_id = parse_video_id(req.url)
         except InvalidUrl as exc:
             return JSONResponse({"detail": str(exc)}, status_code=422)
+        level = "text" if req.level is None else req.level
+        if level not in LEVELS:
+            return JSONResponse(
+                {"detail": f"Le niveau doit être {' ou '.join(LEVELS)}."}, status_code=422
+            )
         try:
-            job = store.start()
+            job = store.start(frames=level == "frames")
         except j.JobBusy as exc:
             return JSONResponse({"detail": str(exc)}, status_code=409)
         threading.Thread(

@@ -12,7 +12,7 @@ KEY = "yt-transcriber-job"
 THEME_KEY = "yt-transcriber-theme"
 # The real model takes about 30 s, the margin covers the download.
 DONE_TIMEOUT = 240_000
-RUNNING = re.compile("Transcription|Téléchargement")
+RUNNING = re.compile("Transcription|Téléchargement|Extraction")
 
 
 def wait_done(page):
@@ -145,3 +145,19 @@ def test_theme_toggle_is_kept_after_reload(page, base_url):
     expect(page.locator("html")).not_to_have_class(re.compile(r"\bdark\b"))
     assert page.evaluate("key => localStorage.getItem(key)", THEME_KEY) == "light"
     page.evaluate("key => localStorage.removeItem(key)", THEME_KEY)
+
+
+def test_slides_button_shows_the_extraction_step(page, base_url, video_url, e2e_level):
+    page.goto(base_url)
+    page.fill("#url", video_url)
+    page.click("#go-frames")
+    expect(page.locator("#go")).to_be_disabled()
+    expect(page.locator("#go-frames")).to_be_disabled()
+    expect(page.locator("#status")).to_have_text("Extraction des images", timeout=DONE_TIMEOUT)
+    wait_done(page)
+    expect(page.locator("#go")).to_be_enabled()
+    expect(page.locator("#go-frames")).to_be_enabled()
+    # The number of slides depends on the video, so only the fake level counts them.
+    if e2e_level == "fake":
+        run = page.request.get(f"{base_url}/runs/latest").json()
+        assert run["level"] == "frames" and len(run["frames"]) == 2

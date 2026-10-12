@@ -53,5 +53,5 @@ Les images sont écrites en WebP et rangées selon `run-storage.md`. Les seuils 
 
 Date : 2026-10-12.
 
-- **Échec de la capture** : le job reste `done`, sans images, et l'erreur est journalisée. Perdre une transcription réussie pour une image ratée coûte plus cher que de n'avoir pas d'images. Choix supposé : #51 pourra décider de l'afficher à l'utilisateur.
+- **Échec de la capture** : le job reste `done`, sans images, et l'erreur est journalisée. Perdre une transcription réussie pour une image ratée coûte plus cher que de n'avoir pas d'images. Choix supposé, reconduit par #51 qui ne l'affiche pas à l'utilisateur.
 - **Format de repli** : après AV1 puis VP9, le sélecteur de yt-dlp prend `bestvideo[height<=720]`, quel que soit le codec (`h264` compris, PyAV le décode).
