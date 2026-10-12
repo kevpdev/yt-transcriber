@@ -1,6 +1,6 @@
 ---
 objective: "Un job terminé rend ses segments horodatés par l'API et dans la table `segments`, et la page bascule entre texte brut et texte horodaté, la copie suivant la vue affichée."
-status: pending
+status: reviewed
 ---
 
 # Plan: Transcription horodatée

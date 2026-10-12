@@ -113,4 +113,4 @@ journey
 | 1    | Le bouton Copier met dans le presse-papiers exactement la vue affichée                                                 |
 | 1    | Un début de segment au-delà d'une heure s'affiche `[h:mm:ss]`                                                          |
 | 2    | `scripts/e2e.sh fake` sort en 0 avec le nouveau scénario                                                               |
-| 3    | `grep -ri "no timestamps\|sans horodatage" README.md aidd_docs/memory` ne rend rien, et `segments` figure dans `api.md` et le README |
+| 3    | `grep -ri --exclude-dir=internal "no timestamps\|sans horodatage" README.md aidd_docs/memory` ne rend rien, `stack.md` porte une ligne de remplacement partiel datée vers #48, et `segments` figure dans `api.md` et le README |
