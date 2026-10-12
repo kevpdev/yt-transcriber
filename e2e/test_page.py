@@ -147,16 +147,16 @@ def test_theme_toggle_is_kept_after_reload(page, base_url):
     page.evaluate("key => localStorage.removeItem(key)", THEME_KEY)
 
 
-def test_frames_choice_shows_the_extraction_step(page, base_url, video_url, e2e_level):
+def test_slides_button_shows_the_extraction_step(page, base_url, video_url, e2e_level):
     page.goto(base_url)
-    expect(page.locator("#frames")).not_to_be_checked()
     page.fill("#url", video_url)
-    page.check("#frames")
-    page.click("#go")
-    expect(page.locator("#frames")).to_be_disabled()
+    page.click("#go-frames")
+    expect(page.locator("#go")).to_be_disabled()
+    expect(page.locator("#go-frames")).to_be_disabled()
     expect(page.locator("#status")).to_have_text("Extraction des images", timeout=DONE_TIMEOUT)
     wait_done(page)
-    expect(page.locator("#frames")).to_be_enabled()
+    expect(page.locator("#go")).to_be_enabled()
+    expect(page.locator("#go-frames")).to_be_enabled()
     # The number of slides depends on the video, so only the fake level counts them.
     if e2e_level == "fake":
         run = page.request.get(f"{base_url}/runs/latest").json()

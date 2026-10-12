@@ -40,7 +40,7 @@ function render() {
   $("out").value = timed ? timedText(finished.segments) : finished.text;
 }
 
-function setBusy(busy) { $("go").disabled = busy; $("frames").disabled = busy; }
+function setBusy(busy) { $("go").disabled = busy; $("go-frames").disabled = busy; }
 function showError(msg) { $("error").textContent = msg || ""; }
 
 async function readError(resp) {
@@ -97,6 +97,8 @@ async function poll(id, failures = 0) {
 
 $("form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
+  // Enter in the URL field submits with the first button, so it stays text only.
+  const level = ev.submitter?.id === "go-frames" ? "frames" : "text";
   clearTimeout(timer);
   showError("");
   finished = null;
@@ -106,7 +108,7 @@ $("form").addEventListener("submit", async (ev) => {
     const resp = await fetch("/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: $("url").value, level: $("frames").checked ? "frames" : "text" }),
+      body: JSON.stringify({ url: $("url").value, level }),
     });
     if (!resp.ok) {
       showError(await readError(resp));
