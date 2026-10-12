@@ -15,7 +15,7 @@ FAKE_TEXT = (
 # Long enough to reload the page and cut the network during the job.
 FAKE_DURATION = 10.0
 _STEPS = 10
-_SENTENCES = [s for s in FAKE_TEXT.split(". ")]
+_SENTENCES = FAKE_TEXT.split(". ")
 
 
 def fake_download(url: str, dest_dir: Path) -> Download:

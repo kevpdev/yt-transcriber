@@ -119,10 +119,7 @@ def test_timestamps_toggle_switches_the_view_and_the_copy(page, base_url, video_
 
     page.click("#copy")
     expect(page.locator("#status")).to_have_text("Texte copié dans le presse-papiers.")
-    page.fill("#url", "")
-    page.focus("#url")
-    page.keyboard.press("Shift+Insert")
-    assert page.input_value("#url") == " ".join(lines)
+    assert page.evaluate("navigator.clipboard.readText()") == timed
 
     toggle.click()
     expect(toggle).to_have_attribute("aria-pressed", "false")

@@ -3,7 +3,10 @@
 import json
 import sqlite3
 import threading
+from collections.abc import Sequence
 from pathlib import Path
+
+from .transcribe import Segment
 
 SCHEMA_VERSION = 2
 
@@ -93,7 +96,13 @@ class RunStore:
         )
 
     def record(
-        self, *, settings: dict, machine: dict, versions: dict, segments=(), **fields
+        self,
+        *,
+        settings: dict,
+        machine: dict,
+        versions: dict,
+        segments: Sequence[Segment] = (),
+        **fields,
     ) -> None:
         unknown = set(fields) - set(_COLUMNS)
         if unknown:

@@ -3,6 +3,7 @@
 - Date: 2026-10-06
 - Status: Accepted
 - Superseded by (partiel): `aidd_docs/memory/internal/decisions/lockfile.md`, ligne « Audio » (`yt-dlp` non figé)
+- Superseded by (partiel), 2026-10-12: issue #48, la transcription est aussi rendue horodatée, la mention « sans horodatage » du contexte ne vaut plus
 
 ## Contexte
 

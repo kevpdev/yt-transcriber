@@ -1,5 +1,6 @@
 import threading
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .transcribe import Segment
@@ -67,10 +68,10 @@ class JobStore:
     def set_progress(self, job: Job, progress: float) -> None:
         job.progress = progress
 
-    def finish(self, job: Job, text: str, segments: list[Segment] | None = None) -> None:
+    def finish(self, job: Job, text: str, segments: Sequence[Segment]) -> None:
         with self._lock:
             job.text = text
-            job.segments = list(segments or [])
+            job.segments = list(segments)
             job.progress = 1.0
             job.stage = DONE
 

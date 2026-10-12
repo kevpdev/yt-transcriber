@@ -49,7 +49,7 @@ def test_store_refuses_second_job_until_first_finishes():
     first = store.start()
     with pytest.raises(j.JobBusy):
         store.start()
-    store.finish(first, "x")
+    store.finish(first, "x", [])
     assert store.start().id != first.id
 
 

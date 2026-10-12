@@ -52,7 +52,7 @@ def test_fake_job_goes_through_downloading_transcribing_done_in_order(monkeypatc
         seen.append(stage)
         set_stage(self, job, stage, progress)
 
-    def spy_finish(self, job, text, segments=None):
+    def spy_finish(self, job, text, segments):
         seen.append(j.DONE)
         finish(self, job, text, segments)
 
