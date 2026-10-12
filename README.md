@@ -14,8 +14,8 @@ Prérequis : Docker avec Compose, `nvidia-container-toolkit`, un GPU NVIDIA réc
 
 ## Utiliser
 
-1. Colle l'URL de la vidéo, coche « Capturer les images » si tu veux aussi les slides, et clique sur « Transcrire ».
-2. La page affiche l'étape (téléchargement, transcription, puis extraction des images si la case est cochée) et le pourcentage de la transcription.
+1. Colle l'URL de la vidéo et clique sur « Transcrire », ou sur « Transcrire avec les slides » si tu veux aussi les images.
+2. La page affiche l'étape (téléchargement, transcription, puis extraction des images avec le second bouton) et le pourcentage de la transcription.
 3. Le texte arrive dans la grande zone. Le bouton aux deux feuilles superposées le copie.
 
 La langue parlée est détectée automatiquement et le texte sort dans cette langue, sans traduction. Un seul job tourne à la fois, un second reçoit un message clair.
@@ -35,7 +35,7 @@ Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d
 
 ### Capturer les slides à la main
 
-La page propose la case « Capturer les images » : cochée, le job passe par l'étape `extracting` après la transcription. La route qui sert les fichiers vient avec l'issue #52. La fonction de capture se lance aussi seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
+Le bouton « Transcrire avec les slides » de la page lance un job qui passe par l'étape `extracting` après la transcription. La route qui sert les fichiers vient avec l'issue #52. La fonction de capture se lance aussi seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
 
 ```sh
 docker compose run --rm --no-deps yt-transcriber python -m app.frames https://www.youtube.com/watch?v=KnXm3PbNz5A /tmp/frames
