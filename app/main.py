@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import shutil
 import tempfile
 import threading
 import time
@@ -15,7 +16,8 @@ from pydantic import BaseModel
 
 from . import jobs as j
 from .audio import AudioError, download_audio
-from .fake import FakeTranscriber, fake_download
+from .fake import FakeTranscriber, fake_capture, fake_download
+from .frames import Frame, capture_frames
 from .machine import read_machine, read_versions
 from .runs import RunStore, to_markdown
 from .transcribe import Transcriber, settings
@@ -29,9 +31,15 @@ class JobRequest(BaseModel):
     url: str = ""
 
 
-def create_app(transcriber=None, download=download_audio, runs: RunStore | None = None) -> FastAPI:
+def create_app(
+    transcriber=None,
+    download=download_audio,
+    runs: RunStore | None = None,
+    capture=capture_frames,
+    jobs: j.JobStore | None = None,
+) -> FastAPI:
     transcriber = transcriber or Transcriber()
-    store = j.JobStore()
+    store = jobs or j.JobStore()
     runs = runs or RunStore(":memory:")
     env: dict = {}
 
@@ -44,12 +52,22 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
 
     app = FastAPI(lifespan=lifespan)
 
+    def capture_images(job: j.Job, url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
+        # Losing a transcript for a failed image costs more than having no images.
+        try:
+            return capture(url, work_dir, out_dir)
+        except Exception:  # noqa: BLE001 - the job stays done, without images
+            log.exception("Could not capture frames for run %s", job.id)
+            shutil.rmtree(out_dir, ignore_errors=True)
+            return []
+
     def work(job: j.Job, video_id: str, url: str) -> None:
         started_at = datetime.now(UTC).isoformat()
         t0 = time.monotonic()
         t_download = t_transcribe = None
         meta = None
         result = None
+        images: list[Frame] = []
         error = None
         try:
             store.set_stage(job, j.DOWNLOADING)
@@ -59,6 +77,8 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
                 store.set_stage(job, j.TRANSCRIBING)
                 result = transcriber.run(meta.path, lambda p: store.set_progress(job, p))
                 t_transcribe = time.monotonic() - t0 - t_download
+                if job.frames and runs.frames_dir:
+                    images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
         except AudioError as exc:
             error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
@@ -92,6 +112,7 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
                 machine=env.get("machine", {}),
                 versions=env.get("versions", {}),
                 segments=result.segments if done and result else (),
+                frames=images if done else (),
             )
         except Exception:  # noqa: BLE001 - a storage failure never changes the job
             log.exception("Could not record run %s", job.id)
@@ -181,5 +202,5 @@ def build_app() -> FastAPI:
     # started by `uvicorn --factory app.main:build_app`, tests import it without a GPU
     runs = RunStore(os.environ.get("YT_DB", "/data/runs.db"))
     if os.environ.get("YT_FAKE") == "1":
-        return create_app(FakeTranscriber(), fake_download, runs)
+        return create_app(FakeTranscriber(), fake_download, runs, fake_capture)
     return create_app(runs=runs)

@@ -4,7 +4,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
+
 from .audio import Download
+from .frames import Frame, write_webp
 from .transcribe import Segment, Transcript
 
 FAKE_TEXT = (
@@ -38,6 +41,17 @@ def fake_segments() -> list[Segment]:
         )
         for i, sentence in enumerate(_SENTENCES)
     ]
+
+
+def fake_capture(url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
+    """Two synthetic WebP images, one per half of the fake video."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    frames = []
+    for position, shade in enumerate((60, 200)):
+        path = out_dir / f"{position:04d}.webp"
+        write_webp(np.full((72, 128, 3), shade, dtype=np.uint8), path)
+        frames.append(Frame(position=position, time=position * FAKE_DURATION / 2, path=path))
+    return frames
 
 
 class FakeTranscriber:

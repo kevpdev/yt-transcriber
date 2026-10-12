@@ -6,7 +6,9 @@ from fastapi.testclient import TestClient
 
 from app import jobs as j
 from app.audio import AudioError, Download
+from app.fake import fake_capture
 from app.main import create_app
+from app.runs import RunStore
 from app.transcribe import Segment, Transcript
 
 URL = "https://www.youtube.com/watch?v=gsxiFd8AZQU"
@@ -121,3 +123,47 @@ def test_download_error_becomes_readable_job_error():
 def test_unknown_job_is_404():
     client = TestClient(create_app(FakeTranscriber(), fake_download))
     assert client.get("/jobs/nope").status_code == 404
+
+
+def test_job_with_frames_records_one_row_per_file_on_disk(tmp_path):
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(
+        create_app(FakeTranscriber(), fake_download, runs, fake_capture, j.JobStore(frames=True))
+    )
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    frames = client.get(f"/runs/{job_id}").json()["frames"]
+    assert [f["position"] for f in frames] == [0, 1]
+    assert [f["path"] for f in frames] == [f"frames/{job_id}/000{i}.webp" for i in (0, 1)]
+    assert all((tmp_path / f["path"]).is_file() for f in frames)
+
+
+def test_job_without_frames_never_calls_the_capture(tmp_path):
+    def capture(*_):
+        raise AssertionError("capture must not run")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, capture))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    assert client.get(f"/runs/{job_id}").json()["frames"] == []
+    assert not (tmp_path / "frames").exists()
+
+
+def test_failed_capture_leaves_the_job_done_without_images(tmp_path, caplog):
+    def capture(url, work_dir, out_dir):
+        out_dir.mkdir(parents=True)
+        (out_dir / "0000.webp").touch()
+        raise RuntimeError("decode failed")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(
+        create_app(FakeTranscriber(), fake_download, runs, capture, j.JobStore(frames=True))
+    )
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
+    run = client.get(f"/runs/{job_id}").json()
+    assert run["state"] == "done" and run["frames"] == []
+    assert not (tmp_path / "frames" / job_id).exists()
+    assert "Could not capture frames" in caplog.text
