@@ -1,6 +1,6 @@
 ---
 objective: "Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite sur un volume nommé, avec les six familles de champs de #8, et l'historique survit à `docker compose down` puis `up`."
-status: implemented
+status: reviewed
 ---
 
 # Plan: Stockage des runs en SQLite
