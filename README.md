@@ -35,7 +35,7 @@ Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d
 
 ### Capturer les slides à la main
 
-Le bouton « Transcrire avec les slides » de la page lance un job qui passe par l'étape `extracting` après la transcription. La route qui sert les fichiers vient avec l'issue #52. La fonction de capture se lance aussi seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
+Le bouton « Transcrire avec les slides » de la page lance un job qui passe par l'étape `extracting` après la transcription. Les images se téléchargent par l'`url` de chaque slide dans `GET /runs/{id}`. La fonction de capture se lance aussi seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
 
 ```sh
 docker compose run --rm --no-deps yt-transcriber python -m app.frames https://www.youtube.com/watch?v=KnXm3PbNz5A /tmp/frames
@@ -82,7 +82,8 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 - `GET /jobs/{id}` renvoie `{id, stage, progress, text, segments, error}`. `stage` vaut `queued`, `downloading`, `transcribing`, `extracting` (niveau `frames` seulement), `done` ou `error`. `segments` est la liste des `{start, end, text}` du job terminé (secondes depuis le début), vide tant qu'il n'est pas `done`.
 - `GET /runs?limit=&offset=` liste les runs terminés, du plus récent au plus ancien. `limit` de 1 à 100 (20 par défaut), `offset` au moins 0, sinon `422`. Renvoie `{runs, total, limit, offset}`, chaque run étant un résumé (`id, video_id, url, title, channel, video_duration, state, level, language, word_count, started_at, total_s`).
 - `GET /runs/latest` renvoie le dernier run réussi (état `done`) en entier, `404 {"detail": "Aucun run réussi."}` s'il n'y en a aucun.
-- `GET /runs/{id}` renvoie le run complet (métadonnées, télémétrie, `text`, `segments`, `frames`, la liste des `{position, time, path}` des slides, vide sans capture), `404` si l'id est inconnu.
+- `GET /runs/{id}` renvoie le run complet (métadonnées, télémétrie, `text`, `segments`, `frames`, la liste des `{position, time, path, url}` des slides, vide sans capture), `404` si l'id est inconnu. `GET /runs/latest` porte aussi `url`.
+- `GET /runs/{id}/frames/{name}` renvoie l'image WebP d'un slide (`url` relative donnée par `GET /runs/{id}`). `404 {"detail": "Image inconnue."}` si le nom n'est pas une image du run ou si le fichier a disparu, `404 {"detail": "Run inconnu."}` si l'id est inconnu.
 - `GET /runs/{id}/markdown` renvoie le transcript en `text/markdown` : un titre, puis une ligne `[mm:ss] texte` par segment (`[h:mm:ss]` dès une heure).
 
 ## Tests
