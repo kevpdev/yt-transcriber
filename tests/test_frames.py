@@ -26,6 +26,23 @@ def pattern(seed: int) -> np.ndarray:
     return np.random.default_rng(seed).integers(0, 256, (H, W, 3), dtype=np.uint8)
 
 
+def slide(*bars: tuple[int, int, int]) -> np.ndarray:
+    """A template slide: light background, dark text-like bars given as (row, left, right)."""
+    rgb = np.full((H, W, 3), 235, dtype=np.uint8)
+    for row, left, right in bars:
+        rgb[row : row + 6, left:right] = 25
+    return rgb
+
+
+TWO_LINES = slide((10, 8, 90), (24, 8, 70))
+FOUR_LINES = slide((10, 8, 90), (24, 8, 70), (38, 8, 110), (52, 8, 50))
+OTHER_SLIDE = slide((6, 40, 120), (30, 10, 40), (60, 70, 120))
+
+
+def blend(a: np.ndarray, b: np.ndarray, share: float) -> np.ndarray:
+    return (a.astype(float) * (1 - share) + b.astype(float) * share).astype(np.uint8)
+
+
 def run(*screens: tuple[np.ndarray, int], start: float = 0.0):
     """Samples one per second, each screen shown for the given number of seconds."""
     t = start
@@ -62,6 +79,36 @@ def test_noise_below_the_threshold_does_not_start_a_new_slide():
     noisy = np.clip(base.astype(int) + 2, 0, 255).astype(np.uint8)
     kept = select_frames(run((base, 3), (noisy, 3)))
     assert len(kept) == 1
+
+
+def test_crossfade_keeps_the_target_screen_not_the_blend():
+    mid = blend(TWO_LINES, OTHER_SLIDE, 0.6)
+    kept = select_frames(run((TWO_LINES, 5), (mid, 1), (OTHER_SLIDE, 5)))
+    assert len(kept) == 2
+    assert np.array_equal(kept[1][1], OTHER_SLIDE)
+
+
+def test_bullet_reveal_keeps_the_fullest_version(monkeypatch):
+    # Same-template slides sit within HASH_DISTANCE of each other, so the current threshold
+    # would dedupe the reveal. That is the calibration of #53, this test checks the selection.
+    monkeypatch.setattr(frames, "HASH_DISTANCE", 0)
+    kept = select_frames(run((TWO_LINES, 5), (FOUR_LINES, 5)))
+    assert [t for t, _ in kept] == [0.0, 5.0]
+    assert np.array_equal(kept[-1][1], FOUR_LINES)
+
+
+def test_small_drift_before_the_commit_keeps_the_last_sample_timed_at_the_start():
+    drifted = np.clip(TWO_LINES.astype(int) + 4, 0, 255).astype(np.uint8)
+    kept = select_frames(run((TWO_LINES, 1), (drifted, 4)))
+    assert [t for t, _ in kept] == [0.0]
+    assert np.array_equal(kept[0][1], drifted)
+
+
+def test_change_is_measured_against_the_stable_image():
+    drifted = np.clip(TWO_LINES.astype(int) + 4, 0, 255).astype(np.uint8)
+    further = np.clip(TWO_LINES.astype(int) + 8, 0, 255).astype(np.uint8)
+    # +4 holds 3 s then +8 is 4 away from it, under the threshold: one screen, not two.
+    assert len(select_frames(run((TWO_LINES, 1), (drifted, 3), (further, 4)))) == 1
 
 
 def test_frames_never_exceed_the_cap(monkeypatch):

@@ -17,9 +17,9 @@ from pydantic import BaseModel
 from . import jobs as j
 from .audio import AudioError, download_audio
 from .fake import FakeTranscriber, fake_capture, fake_download
-from .frames import Frame, capture_frames
+from .frames import capture_frames
 from .machine import read_machine, read_versions
-from .runs import RunStore, to_markdown
+from .runs import Frame, RunStore, to_markdown
 from .transcribe import Transcriber, settings
 from .urls import InvalidUrl, canonical_url, parse_video_id
 
@@ -116,6 +116,8 @@ def create_app(
             )
         except Exception:  # noqa: BLE001 - a storage failure never changes the job
             log.exception("Could not record run %s", job.id)
+            if runs.frames_dir:
+                shutil.rmtree(runs.frames_dir / job.id, ignore_errors=True)
         if done and result:
             store.finish(job, result.text, result.segments)
         else:

@@ -4,12 +4,22 @@ import json
 import sqlite3
 import threading
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
-from .frames import Frame
 from .transcribe import Segment
 
 SCHEMA_VERSION = 3
+
+
+@dataclass
+class Frame:
+    """One captured slide: its position, its start in the video (seconds) and its file."""
+
+    position: int
+    time: float
+    path: Path
+
 
 _RUNS_SCHEMA = """
 CREATE TABLE runs (
@@ -162,6 +172,10 @@ class RunStore:
         blobs = [json.dumps(v) for v in (settings, machine, versions)]
         names = ", ".join((*_COLUMNS, *_JSON_COLUMNS))
         marks = ", ".join(["?"] * (len(_COLUMNS) + len(_JSON_COLUMNS)))
+        # Computed before the transaction, so a path outside the folder cannot lose the run.
+        frame_rows = [
+            (fields.get("id"), f.position, f.time, self._relative(f.path)) for f in frames
+        ]
         with self._lock, self._db:
             self._db.execute(f"INSERT INTO runs ({names}) VALUES ({marks})", [*values, *blobs])
             self._db.executemany(
@@ -170,7 +184,7 @@ class RunStore:
             )
             self._db.executemany(
                 "INSERT INTO frames (run_id, position, time, path) VALUES (?, ?, ?, ?)",
-                [(fields.get("id"), f.position, f.time, self._relative(f.path)) for f in frames],
+                frame_rows,
             )
 
     def count(self) -> int:

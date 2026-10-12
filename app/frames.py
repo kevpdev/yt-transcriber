@@ -9,14 +9,14 @@ import sys
 import tempfile
 import time
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import av
 import numpy as np
 
-from .audio import AudioError, _readable
+from .audio import AudioError, readable_error
+from .runs import Frame
 
 log = logging.getLogger(__name__)
 
@@ -37,13 +37,6 @@ _VIDEO_FORMAT = (
 Sample = tuple[float, np.ndarray]
 
 
-@dataclass
-class Frame:
-    position: int
-    time: float
-    path: Path
-
-
 def download_video(url: str, dest_dir: Path) -> Path:
     """Video stream only, 720p at most, AV1 then VP9. yt-dlp never merges, so no ffmpeg."""
     from yt_dlp import YoutubeDL
@@ -62,7 +55,7 @@ def download_video(url: str, dest_dir: Path) -> Path:
             log.info("Downloaded video %s, codec %s", info.get("id"), info.get("vcodec"))
             return Path(ydl.prepare_filename(info))
     except DownloadError as exc:
-        raise AudioError(_readable(str(exc), "la vidéo")) from exc
+        raise AudioError(readable_error(str(exc), "la vidéo")) from exc
 
 
 def sample_frames(video: Path) -> Iterator[Sample]:
@@ -101,25 +94,27 @@ def _distance(a: int, b: int) -> int:
 def select_frames(samples: Iterable[Sample]) -> list[Sample]:
     """One image per screen that stays for STABLE_S, timed at its start, without repeats.
 
-    Pure function of the samples, so it runs without PyAV or network.
+    The image is the sample at commit time, once the screen has held, not the first one above
+    the threshold, which can sit in the middle of a transition. Pure function of the samples,
+    so it runs without PyAV or network.
     """
     kept: list[Sample] = []
     hashes: list[int] = []
-    start = 0.0
-    start_rgb: np.ndarray | None = None
-    start_thumb: np.ndarray | None = None
+    screen: tuple[float, np.ndarray] | None = None  # start time and thumbnail of the screen
     committed = False
     for t, rgb in samples:
         thumb = _thumb(rgb, *THUMB)
-        if start_thumb is None or np.abs(thumb - start_thumb).mean() > CHANGE_THRESHOLD:
-            start, start_rgb, start_thumb, committed = t, rgb, thumb, False
-        if committed or t - start < STABLE_S or start_rgb is None:
+        if screen is None or np.abs(thumb - screen[1]).mean() > CHANGE_THRESHOLD:
+            screen, committed = (t, thumb), False
+        start = screen[0]
+        if committed or t - start < STABLE_S:
             continue
         committed = True
-        digest = dhash(start_rgb)
+        screen = (start, thumb)  # next change is measured against the stable image
+        digest = dhash(rgb)
         if all(_distance(digest, h) > HASH_DISTANCE for h in hashes):
             hashes.append(digest)
-            kept.append((start, start_rgb))
+            kept.append((start, rgb))
             if len(kept) >= MAX_FRAMES:
                 break
     return kept

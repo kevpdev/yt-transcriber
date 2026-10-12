@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 
 from .audio import Download
-from .frames import Frame, write_webp
+from .frames import write_webp
+from .runs import Frame
 from .transcribe import Segment, Transcript
 
 FAKE_TEXT = (

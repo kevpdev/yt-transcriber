@@ -6,9 +6,8 @@ from fastapi.testclient import TestClient
 from app import jobs as j
 from app import machine
 from app.audio import AudioError
-from app.frames import Frame
 from app.main import create_app
-from app.runs import _RUNS_SCHEMA, _SEGMENTS_SCHEMA, RunStore, to_markdown
+from app.runs import _RUNS_SCHEMA, _SEGMENTS_SCHEMA, Frame, RunStore, to_markdown
 from app.transcribe import Segment, settings
 from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 
