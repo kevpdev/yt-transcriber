@@ -212,6 +212,11 @@ class RunStore:
             ).fetchall()
         return [dict(zip(_SUMMARY_COLUMNS, row, strict=True)) for row in rows]
 
+    def has_run(self, run_id: str) -> bool:
+        with self._lock:
+            row = self._db.execute("SELECT 1 FROM runs WHERE id = ?", (run_id,)).fetchone()
+        return row is not None
+
     def latest_id(self) -> str | None:
         with self._lock:
             row = self._db.execute(
@@ -242,6 +247,24 @@ class RunStore:
         run["segments"] = [{"start": a, "end": b, "text": t} for a, b, t in segs]
         run["frames"] = [{"position": p, "time": t, "path": f} for p, t, f in imgs]
         return run
+
+    def frame_file(self, run_id: str, name: str) -> Path | None:
+        """The file of an image of this run, found by its file name among the recorded rows.
+
+        The table is the allow-list: a name that is not in it (`../runs.db`) matches nothing.
+        None for `:memory:`, an unknown name, or a file missing from the disk.
+        """
+        if self._root is None:
+            return None
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT path FROM frames WHERE run_id = ? ORDER BY position", (run_id,)
+            ).fetchall()
+        for (path,) in rows:
+            if Path(path).name == name:
+                file = self._root / path
+                return file if file.is_file() else None
+        return None
 
     def query(self, sql: str, params: tuple = ()) -> list[tuple]:
         with self._lock:
