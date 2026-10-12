@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import tempfile
 import threading
 import time
@@ -7,8 +8,8 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -16,7 +17,7 @@ from . import jobs as j
 from .audio import AudioError, download_audio
 from .fake import FakeTranscriber, fake_download
 from .machine import read_machine, read_versions
-from .runs import RunStore
+from .runs import RunStore, to_markdown
 from .transcribe import Transcriber, settings
 from .urls import InvalidUrl, canonical_url, parse_video_id
 
@@ -120,6 +121,52 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
         if job is None:
             return JSONResponse({"detail": "Job inconnu."}, status_code=404)
         return job.view()
+
+    def int_param(request: Request, name: str, default: int, low: int, high: int | None) -> int:
+        raw = request.query_params.get(name)
+        if raw is None:
+            return default
+        value = int(raw) if re.fullmatch(r"-?[0-9]+", raw) else None
+        if value is None or value < low or (high is not None and value > high):
+            bounds = f"entre {low} et {high}" if high is not None else f"supérieur ou égal à {low}"
+            raise HTTPException(
+                status_code=422,
+                detail=f"Le paramètre {name} doit être un entier {bounds}.",
+            )
+        return value
+
+    @app.get("/runs")
+    def list_runs(request: Request):
+        limit = int_param(request, "limit", 20, 1, 100)
+        offset = int_param(request, "offset", 0, 0, None)
+        return {
+            "runs": runs.list_runs(limit, offset),
+            "total": runs.count(),
+            "limit": limit,
+            "offset": offset,
+        }
+
+    @app.get("/runs/latest")
+    def get_latest_run():
+        run_id = runs.latest_id()
+        run = runs.get_run(run_id) if run_id else None
+        if run is None:
+            return JSONResponse({"detail": "Aucun run réussi."}, status_code=404)
+        return run
+
+    @app.get("/runs/{run_id}")
+    def get_run(run_id: str):
+        run = runs.get_run(run_id)
+        if run is None:
+            return JSONResponse({"detail": "Run inconnu."}, status_code=404)
+        return run
+
+    @app.get("/runs/{run_id}/markdown")
+    def get_run_markdown(run_id: str):
+        run = runs.get_run(run_id)
+        if run is None:
+            return JSONResponse({"detail": "Run inconnu."}, status_code=404)
+        return Response(to_markdown(run), media_type="text/markdown; charset=utf-8")
 
     @app.get("/")
     def index():

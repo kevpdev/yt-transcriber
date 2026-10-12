@@ -68,6 +68,33 @@ _COLUMNS = (
     "speed_ratio",
 )
 _JSON_COLUMNS = ("settings", "machine", "versions")
+_SUMMARY_COLUMNS = (
+    "id",
+    "video_id",
+    "url",
+    "title",
+    "channel",
+    "video_duration",
+    "state",
+    "language",
+    "word_count",
+    "started_at",
+    "total_s",
+)
+
+
+def format_time(seconds: float) -> str:
+    """Same format as formatTime in app/static/app.js."""
+    total = int(seconds)
+    h, rest = divmod(total, 3600)
+    clock = f"{rest // 60:02d}:{rest % 60:02d}"
+    return f"{h}:{clock}" if h > 0 else clock
+
+
+def to_markdown(run: dict) -> str:
+    """Title, blank line, then one `[mm:ss] text` line per segment."""
+    lines = [f"[{format_time(s['start'])}] {s['text']}" for s in run["segments"]]
+    return "\n".join([f"# {run['title'] or run['video_id']}", "", *lines]) + "\n"
 
 
 class RunStore:
@@ -117,6 +144,45 @@ class RunStore:
                 "INSERT INTO segments (run_id, position, start, end, text) VALUES (?, ?, ?, ?, ?)",
                 [(fields.get("id"), i, s.start, s.end, s.text) for i, s in enumerate(segments)],
             )
+
+    def count(self) -> int:
+        with self._lock:
+            return self._db.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+
+    def list_runs(self, limit: int, offset: int) -> list[dict]:
+        cols = ", ".join(_SUMMARY_COLUMNS)
+        with self._lock:
+            rows = self._db.execute(
+                f"SELECT {cols} FROM runs ORDER BY started_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+        return [dict(zip(_SUMMARY_COLUMNS, row, strict=True)) for row in rows]
+
+    def latest_id(self) -> str | None:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT id FROM runs WHERE state = 'done' "
+                "ORDER BY started_at DESC, rowid DESC LIMIT 1"
+            ).fetchone()
+        return row[0] if row else None
+
+    def get_run(self, run_id: str) -> dict | None:
+        names = (*_COLUMNS, *_JSON_COLUMNS)
+        with self._lock:
+            row = self._db.execute(
+                f"SELECT {', '.join(names)} FROM runs WHERE id = ?", (run_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            segs = self._db.execute(
+                "SELECT start, end, text FROM segments WHERE run_id = ? ORDER BY position",
+                (run_id,),
+            ).fetchall()
+        run: dict = dict(zip(names, row, strict=True))
+        for col in _JSON_COLUMNS:
+            run[col] = json.loads(run[col]) if run[col] is not None else None
+        run["segments"] = [{"start": a, "end": b, "text": t} for a, b, t in segs]
+        return run
 
     def query(self, sql: str, params: tuple = ()) -> list[tuple]:
         with self._lock:
