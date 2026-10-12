@@ -11,6 +11,7 @@ flowchart TD
     main --> runs["app/runs.py"]
     main --> machine["app/machine.py"]
     main --> frames["app/frames.py"]
+    frames --> runs
 ```
 
 ## Areas

@@ -35,7 +35,7 @@ Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d
 
 ### Capturer les slides à la main
 
-Le choix « avec images » dans la page et la route qui sert les fichiers viennent avec les issues #51 et #52. En attendant, la fonction que le job appellera se lance seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (80 au plus), écrit les WebP et supprime la vidéo.
+Le choix « avec images » dans la page et la route qui sert les fichiers viennent avec les issues #51 et #52. En attendant, la fonction que le job appellera se lance seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
 
 ```sh
 docker compose run --rm --no-deps yt-transcriber python -m app.frames https://www.youtube.com/watch?v=KnXm3PbNz5A /tmp/frames
