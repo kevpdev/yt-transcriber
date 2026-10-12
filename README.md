@@ -1,6 +1,6 @@
 # yt-transcriber
 
-Colle l'URL d'une vidéo YouTube, récupère la transcription brute (sans horodatage), copie-la en un clic. Tout tourne en local sur le GPU, sans compte ni quota.
+Colle l'URL d'une vidéo YouTube, récupère la transcription, en texte brut ou horodatée d'un clic, copie-la en un clic. Tout tourne en local sur le GPU, sans compte ni quota.
 
 ## Lancer
 
@@ -31,7 +31,7 @@ Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
 
 ## Historique des runs
 
-Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `data/runs.db` dans le repo (monté sur `/data` dans le conteneur). La ligne garde la vidéo (identifiant, titre, chaîne, durée), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. `docker compose down` et `down -v` gardent l'historique, il s'efface avec `sudo rm -r data` (le fichier appartient à root).
+Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `data/runs.db` dans le repo (monté sur `/data` dans le conteneur). La ligne garde la vidéo (identifiant, titre, chaîne, durée), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. Les segments horodatés d'un run réussi vont dans la table `segments` (`run_id`, `position`, `start`, `end`, `text`). `docker compose down` et `down -v` gardent l'historique, il s'efface avec `sudo rm -r data` (le fichier appartient à root).
 
 Pour le suivre en direct dans un GUI, ouvre `data/runs.db` en lecture seule, par exemple dans DBeaver (connexion SQLite) ou DB Browser for SQLite. Les colonnes `settings`, `machine` et `versions` sont du JSON texte, lisible tel quel, et `json_extract(machine, '$.gpu')` en lit un champ.
 
@@ -63,7 +63,7 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 ## API
 
 - `POST /jobs` avec `{"url": "..."}` renvoie `202 {"id"}`, `422` si l'URL est invalide, `409` si un job tourne déjà.
-- `GET /jobs/{id}` renvoie `{stage, progress, text, error}`.
+- `GET /jobs/{id}` renvoie `{id, stage, progress, text, segments, error}`. `segments` est la liste des `{start, end, text}` du job terminé (secondes depuis le début), vide tant qu'il n'est pas `done`.
 
 ## Tests
 
@@ -81,7 +81,7 @@ git config core.hooksPath scripts/hooks
 
 ### Tests de bout en bout de la page
 
-Cinq contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
+Sept contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
 
 ```sh
 scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1

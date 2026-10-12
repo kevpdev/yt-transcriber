@@ -24,7 +24,7 @@ Chaque run terminé, réussi ou en erreur, est écrit dans une base SQLite, un f
 |---|---|---|
 | `runs` | une ligne par run : vidéo, état, erreur, langue, niveau de capture, temps | colonnes SQL |
 | `runs`, suite | réglages du modèle, machine, versions (télémétrie de #8) | colonnes JSON texte, lues en bloc et lisibles telles quelles dans un GUI |
-| `segments` | `run_id`, `start`, `end`, `text` | une ligne par segment |
+| `segments` | `run_id`, `position`, `start`, `end`, `text`, clé `(run_id, position)` | une ligne par segment, `position` garde l'ordre (#48) |
 | `frames` | `run_id`, horodatage, chemin du fichier | une ligne par image |
 
 - **Accès** : module `sqlite3` de la bibliothèque standard, sans ORM, une écriture par run en fin de job.

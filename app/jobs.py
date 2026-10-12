@@ -1,6 +1,9 @@
 import threading
 import uuid
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+
+from .transcribe import Segment
 
 QUEUED, DOWNLOADING, TRANSCRIBING, DONE, ERROR = (
     "queued",
@@ -23,6 +26,7 @@ class Job:
     stage: str = QUEUED
     progress: float = 0.0
     text: str = ""
+    segments: list[Segment] = field(default_factory=list)
     error: str = ""
 
     def view(self) -> dict:
@@ -31,6 +35,7 @@ class Job:
             "stage": self.stage,
             "progress": round(self.progress, 4),
             "text": self.text,
+            "segments": [{"start": s.start, "end": s.end, "text": s.text} for s in self.segments],
             "error": self.error,
         }
 
@@ -63,9 +68,10 @@ class JobStore:
     def set_progress(self, job: Job, progress: float) -> None:
         job.progress = progress
 
-    def finish(self, job: Job, text: str) -> None:
+    def finish(self, job: Job, text: str, segments: Sequence[Segment]) -> None:
         with self._lock:
             job.text = text
+            job.segments = list(segments)
             job.progress = 1.0
             job.stage = DONE
 

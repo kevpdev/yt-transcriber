@@ -103,6 +103,31 @@ def test_copy_puts_the_whole_text_in_the_clipboard(page, base_url, video_url, e2
     assert page.input_value("#url") == text
 
 
+def test_timestamps_toggle_switches_the_view_and_the_copy(page, base_url, video_url):
+    submit(page, base_url, video_url)
+    wait_done(page)
+    raw = page.input_value("#out")
+    toggle = page.locator("#timestamps")
+    expect(toggle).to_have_attribute("aria-pressed", "false")
+
+    toggle.click()
+    expect(toggle).to_have_attribute("aria-pressed", "true")
+    timed = page.input_value("#out")
+    lines = timed.split("\n")
+    assert lines and all(re.match(r"^\[\d{2}:\d{2}\] ", line) for line in lines)
+    assert timed != raw
+
+    page.click("#copy")
+    expect(page.locator("#status")).to_have_text("Texte copié dans le presse-papiers.")
+    assert page.evaluate("navigator.clipboard.readText()") == timed
+
+    toggle.click()
+    expect(toggle).to_have_attribute("aria-pressed", "false")
+    assert page.input_value("#out") == raw
+
+    assert page.evaluate("[formatTime(65), formatTime(3725)]") == ["01:05", "1:02:05"]
+
+
 def test_theme_toggle_is_kept_after_reload(page, base_url):
     page.emulate_media(color_scheme="dark")
     page.goto(base_url)

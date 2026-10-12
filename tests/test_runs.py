@@ -7,7 +7,7 @@ from app import jobs as j
 from app import machine
 from app.audio import AudioError
 from app.main import create_app
-from app.runs import RunStore
+from app.runs import _RUNS_SCHEMA, RunStore
 from app.transcribe import settings
 from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 
@@ -36,6 +36,49 @@ def test_successful_run_is_recorded_with_its_telemetry():
     assert row[14] is not None
     assert row[11] == len("bonjour le monde") and row[12] > 0
     assert row[15] == "text"
+
+
+def test_done_run_stores_its_segments_in_order():
+    runs = RunStore(":memory:")
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(client, job_id)
+    assert runs.query(
+        "SELECT run_id, position, start, end, text FROM segments ORDER BY position"
+    ) == [(job_id, 0, 0.0, 1.5, "bonjour"), (job_id, 1, 1.5, 3.0, "le monde")]
+
+
+def test_failed_run_stores_no_segments():
+    def failing(url, dest):
+        raise AudioError("Video unavailable")
+
+    runs = RunStore(":memory:")
+    client = TestClient(create_app(FakeTranscriber(), failing, runs))
+    wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
+    assert runs.query("SELECT COUNT(*) FROM segments") == [(0,)]
+
+
+def test_version_one_database_migrates_without_losing_runs(tmp_path):
+    path = str(tmp_path / "runs.db")
+    old = sqlite3.connect(path)
+    old.execute(_RUNS_SCHEMA)
+    old.execute(
+        "INSERT INTO runs (id, video_id, url, state, started_at) "
+        "VALUES ('old', 'v', 'u', 'done', 'now')"
+    )
+    old.execute("PRAGMA user_version = 1")
+    old.commit()
+    old.close()
+    runs = RunStore(path)
+    assert runs.query("PRAGMA user_version") == [(2,)]
+    assert runs.query("SELECT id FROM runs") == [("old",)]
+    assert runs.query("SELECT COUNT(*) FROM segments") == [(0,)]
+
+
+def test_two_runs_migration_leaves_the_version_at_two(tmp_path):
+    path = str(tmp_path / "runs.db")
+    RunStore(path)
+    assert RunStore(path).query("PRAGMA user_version") == [(2,)]
 
 
 def test_failed_run_is_recorded_with_its_error_and_no_transcript():
@@ -94,13 +137,13 @@ def test_schema_is_created_once_in_a_file_database(tmp_path):
         versions={},
     )
     second = RunStore(path)
-    assert second.query("PRAGMA user_version") == [(1,)]
+    assert second.query("PRAGMA user_version") == [(2,)]
     assert second.query("SELECT COUNT(*) FROM runs") == [(1,)]
 
 
-def test_fresh_database_is_empty_at_version_one():
+def test_fresh_database_is_empty_at_version_two():
     runs = RunStore(":memory:")
-    assert runs.query("PRAGMA user_version") == [(1,)]
+    assert runs.query("PRAGMA user_version") == [(2,)]
     assert runs.query("SELECT COUNT(*) FROM runs") == [(0,)]
 
 
