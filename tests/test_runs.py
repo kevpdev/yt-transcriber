@@ -1,6 +1,6 @@
 import sqlite3
-import time
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app import jobs as j
@@ -70,11 +70,13 @@ def test_record_failure_leaves_the_job_done(monkeypatch, caplog):
     client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
     body = wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
     assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
-    for _ in range(100):
-        if "Could not record run" in caplog.text:
-            break
-        time.sleep(0.02)
     assert "Could not record run" in caplog.text
+
+
+def test_record_rejects_an_unknown_column():
+    runs = RunStore(":memory:")
+    with pytest.raises(TypeError, match="titel"):
+        runs.record(settings={}, machine={}, versions={}, titel="x")
 
 
 def test_schema_is_created_once_in_a_file_database(tmp_path):
