@@ -27,9 +27,9 @@ CREATE TABLE runs (
     transcribe_s REAL,
     total_s REAL,
     speed_ratio REAL,
-    settings BLOB,
-    machine BLOB,
-    versions BLOB
+    settings TEXT,
+    machine TEXT,
+    versions TEXT
 )
 """
 
@@ -75,7 +75,7 @@ class RunStore:
         values = [fields.get(c) for c in _COLUMNS]
         blobs = [json.dumps(v) for v in (settings, machine, versions)]
         names = ", ".join((*_COLUMNS, *_JSON_COLUMNS))
-        marks = ", ".join(["?"] * len(_COLUMNS) + ["jsonb(?)"] * len(_JSON_COLUMNS))
+        marks = ", ".join(["?"] * (len(_COLUMNS) + len(_JSON_COLUMNS)))
         with self._lock, self._db:
             self._db.execute(f"INSERT INTO runs ({names}) VALUES ({marks})", [*values, *blobs])
 

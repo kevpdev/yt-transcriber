@@ -27,7 +27,7 @@ def test_successful_run_is_recorded_with_its_telemetry():
         "download_s, total_s, json_extract(settings, '$.model'), "
         "char_count, speed_ratio, "
         "json_type(machine, '$.docker'), "
-        "json_extract(versions, '$.yt_dlp') FROM runs"
+        "json_extract(versions, '$.yt_dlp'), typeof(machine) FROM runs"
     )[0]
     assert row[:8] == (job_id, "done", "bonjour le monde", 3, "fr", "T", "C", 12.0)
     assert row[8] >= 0 and row[9] >= row[8]
@@ -35,6 +35,7 @@ def test_successful_run_is_recorded_with_its_telemetry():
     assert row[13] in ("null", "text")
     assert row[14] is not None
     assert row[11] == len("bonjour le monde") and row[12] > 0
+    assert row[15] == "text"
 
 
 def test_failed_run_is_recorded_with_its_error_and_no_transcript():
