@@ -406,11 +406,11 @@ def test_run_frames_list_time_and_url_and_each_url_serves_the_file(tmp_path):
         assert [f["url"] for f in run["frames"]] == [
             f"/runs/{run_id}/frames/000{i}.webp" for i in (0, 1)
         ]
-    for frame in run["frames"]:
-        resp = client.get(frame["url"])
-        assert resp.status_code == 200
-        assert resp.headers["content-type"] == "image/webp"
-        assert resp.content == (tmp_path / frame["path"]).read_bytes()
+        for frame in run["frames"]:
+            resp = client.get(frame["url"])
+            assert resp.status_code == 200
+            assert resp.headers["content-type"] == "image/webp"
+            assert resp.content == (tmp_path / frame["path"]).read_bytes()
 
 
 def test_unknown_frame_name_gives_404_in_french(tmp_path):
@@ -444,12 +444,15 @@ def test_deleted_frame_file_gives_404(tmp_path):
     assert resp.json() == {"detail": "Image inconnue."}
 
 
-def test_memory_store_serves_no_frame():
+def test_memory_store_serves_no_frame_of_a_known_run():
     runs = RunStore(":memory:")
-    assert runs.frame_file("a", "0000.webp") is None
-    client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
-    resp = client.get("/runs/a/frames/0000.webp")
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    assert runs.frame_file(job_id, "0000.webp") is None
+    resp = client.get(f"/runs/{job_id}/frames/0000.webp")
     assert resp.status_code == 404
+    assert resp.json() == {"detail": "Image inconnue."}
 
 
 @pytest.mark.parametrize(

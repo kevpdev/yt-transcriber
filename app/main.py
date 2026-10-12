@@ -206,7 +206,7 @@ def create_app(
 
     @app.get("/runs/{run_id}/frames/{name}")
     def get_run_frame(run_id: str, name: str):
-        if not runs.query("SELECT 1 FROM runs WHERE id = ?", (run_id,)):
+        if not runs.has_run(run_id):
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
         file = runs.frame_file(run_id, name)
         if file is None:

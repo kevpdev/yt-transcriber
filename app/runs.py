@@ -212,6 +212,11 @@ class RunStore:
             ).fetchall()
         return [dict(zip(_SUMMARY_COLUMNS, row, strict=True)) for row in rows]
 
+    def has_run(self, run_id: str) -> bool:
+        with self._lock:
+            row = self._db.execute("SELECT 1 FROM runs WHERE id = ?", (run_id,)).fetchone()
+        return row is not None
+
     def latest_id(self) -> str | None:
         with self._lock:
             row = self._db.execute(
