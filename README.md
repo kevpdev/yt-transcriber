@@ -50,6 +50,7 @@ Lire le dernier run réussi et sa transcription horodatée par l'API :
 ```sh
 curl -s localhost:8000/runs/latest
 curl -s localhost:8000/runs/<id>/markdown
+curl -so 0000.webp localhost:8000/runs/<id>/frames/0000.webp   # une image, URL donnée par `frames[].url`
 ```
 
 Lire la télémétrie des derniers runs, erreurs comprises :
