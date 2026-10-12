@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 ---
 
 # Instruction: Preuve sur `KnXm3PbNz5A` et mémoire à jour

@@ -1,6 +1,6 @@
 ---
 objective: "Un job marqué « avec images » garde les slides de la vidéo en WebP, horodatées, sans doublon et plafonnées, une ligne par image dans la table `frames`, avec PyAV et sans binaire `ffmpeg`, et la vidéo ne reste pas sur le disque."
-status: in-progress
+status: implemented
 ---
 
 # Plan: Capture des slides avec PyAV
