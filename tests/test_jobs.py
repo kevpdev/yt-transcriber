@@ -5,8 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import jobs as j
-from app.audio import AudioError
+from app.audio import AudioError, Download
 from app.main import create_app
+from app.transcribe import Transcript
 
 URL = "https://www.youtube.com/watch?v=gsxiFd8AZQU"
 
@@ -21,11 +22,11 @@ class FakeTranscriber:
         on_progress(0.5)
         if self.gate:
             self.gate.wait(5)
-        return "bonjour le monde"
+        return Transcript(text="bonjour le monde", language="fr", language_probability=0.99)
 
 
 def fake_download(url, dest):
-    return dest / "a.webm"
+    return Download(path=dest / "a.webm", title="T", channel="C", duration=12.0)
 
 
 def wait_for(client, job_id, stages=(j.DONE, j.ERROR)):

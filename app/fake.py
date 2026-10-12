@@ -4,6 +4,9 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from .audio import Download
+from .transcribe import Transcript
+
 FAKE_TEXT = (
     "Ceci est une transcription factice. "
     "Elle sert aux tests de bout en bout de la page, sans GPU. "
@@ -14,17 +17,19 @@ FAKE_DURATION = 10.0
 _STEPS = 10
 
 
-def fake_download(url: str, dest_dir: Path) -> Path:
+def fake_download(url: str, dest_dir: Path) -> Download:
     path = dest_dir / "audio.webm"
     path.touch()
-    return path
+    return Download(
+        path=path, title="Vidéo factice", channel="Chaîne factice", duration=FAKE_DURATION
+    )
 
 
 class FakeTranscriber:
     model = object()  # not None: the lifespan does not call load()
 
-    def run(self, audio: Path, on_progress: Callable[[float], None]) -> str:
+    def run(self, audio: Path, on_progress: Callable[[float], None]) -> Transcript:
         for step in range(1, _STEPS + 1):
             time.sleep(FAKE_DURATION / _STEPS)
             on_progress(step / _STEPS)
-        return FAKE_TEXT
+        return Transcript(text=FAKE_TEXT, language="fr", language_probability=1.0)

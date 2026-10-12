@@ -25,8 +25,25 @@ La langue parlée est détectée automatiquement et le texte sort dans cette lan
 | Variable   | Défaut                                | Rôle                                           |
 | ---------- | ------------------------------------- | ---------------------------------------------- |
 | `HOTWORDS` | `Claude Code, Claude, Anthropic, MCP` | termes tech que Whisper doit orthographier juste |
+| `HOST_DOCKER_VERSION` | vide | version de Docker gardée dans la télémétrie de chaque run, le conteneur ne peut pas la lire seul |
 
 Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
+
+## Historique des runs
+
+Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `data/runs.db` dans le repo (monté sur `/data` dans le conteneur). La ligne garde la vidéo (identifiant, titre, chaîne, durée), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. `docker compose down` et `down -v` gardent l'historique, il s'efface avec `sudo rm -r data` (le fichier appartient à root).
+
+Pour le suivre en direct dans un GUI, ouvre `data/runs.db` en lecture seule, par exemple dans DBeaver (connexion SQLite) ou DB Browser for SQLite. Les colonnes `settings`, `machine` et `versions` sont du JSON texte, lisible tel quel, et `json_extract(machine, '$.gpu')` en lit un champ.
+
+Pour passer la version de Docker : `HOST_DOCKER_VERSION=$(docker version -f '{{.Server.Version}}') docker compose up --build`.
+
+Lire les derniers runs :
+
+```sh
+docker compose exec yt-transcriber python -c 'import sqlite3; [print(r) for r in sqlite3.connect("/data/runs.db").execute("SELECT started_at, state, title, word_count, transcribe_s FROM runs ORDER BY started_at DESC LIMIT 5")]'
+```
+
+Le choix et ses alternatives : [`run-storage.md`](aidd_docs/memory/internal/decisions/run-storage.md).
 
 ## Dépendances
 
