@@ -1,7 +1,7 @@
 # Analyse : trois modes de sortie (texte, résumé, résumé illustré)
 
 - Date : 2026-10-09, révisée trois fois le même jour après arbitrage de l'utilisateur
-- Statut : décision proposée, à figer en ADR avant toute implémentation
+- Statut : validée par l'utilisateur le 2026-10-12, à figer en ADR avant toute implémentation
 - Portée : Q1 à Q6 du brief d'analyse, plus la question rouverte par l'utilisateur sur l'usage agentique. Hors périmètre : implémentation, UI détaillée, traduction (#14), file d'URLs (#12).
 
 ## Verdict
