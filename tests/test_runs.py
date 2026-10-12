@@ -121,6 +121,29 @@ def test_frames_are_recorded_with_paths_relative_to_the_database_folder(tmp_path
     ]
 
 
+def test_frame_outside_the_database_folder_is_dropped_and_the_run_kept(tmp_path, caplog):
+    runs = RunStore(str(tmp_path / "runs.db"))
+    images = [
+        Frame(position=0, time=0.0, path=tmp_path / "frames" / "a" / "0000.webp"),
+        Frame(position=1, time=5.0, path=tmp_path.parent / "elsewhere.webp"),
+    ]
+    runs.record(
+        id="a",
+        video_id="v",
+        url="u",
+        state="done",
+        started_at="now",
+        settings={},
+        machine={},
+        versions={},
+        frames=images,
+    )
+    run = runs.get_run("a")
+    assert run is not None
+    assert run["frames"] == [{"position": 0, "time": 0.0, "path": "frames/a/0000.webp"}]
+    assert "Dropped frame" in caplog.text
+
+
 def test_run_without_images_has_an_empty_frames_list():
     runs = RunStore(":memory:")
     assert runs.frames_dir is None

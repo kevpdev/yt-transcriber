@@ -1,3 +1,4 @@
+import sqlite3
 import threading
 import time
 
@@ -8,7 +9,7 @@ from app import jobs as j
 from app.audio import AudioError, Download
 from app.fake import fake_capture
 from app.main import create_app
-from app.runs import Frame, RunStore
+from app.runs import RunStore
 from app.transcribe import Segment, Transcript
 
 URL = "https://www.youtube.com/watch?v=gsxiFd8AZQU"
@@ -169,19 +170,16 @@ def test_failed_capture_leaves_the_job_done_without_images(tmp_path, caplog):
     assert "Could not capture frames" in caplog.text
 
 
-def test_record_failure_after_capture_removes_the_images(tmp_path, caplog):
-    def capture(url, work_dir, out_dir):
-        out_dir.mkdir(parents=True)
-        (out_dir / "0000.webp").touch()
-        # A path outside the database folder makes the run fail to record.
-        return [Frame(position=0, time=0.0, path=tmp_path.parent / "elsewhere.webp")]
+def test_record_failure_after_capture_removes_the_images(tmp_path, monkeypatch, caplog):
+    def refuse(**_):
+        raise sqlite3.OperationalError("disk full")
 
     runs = RunStore(str(tmp_path / "runs.db"))
+    monkeypatch.setattr(runs, "record", refuse)
     client = TestClient(
-        create_app(FakeTranscriber(), fake_download, runs, capture, j.JobStore(frames=True))
+        create_app(FakeTranscriber(), fake_download, runs, fake_capture, j.JobStore(frames=True))
     )
     job_id = client.post("/jobs", json={"url": URL}).json()["id"]
     assert wait_for(client, job_id)["stage"] == j.DONE
     assert "Could not record run" in caplog.text
     assert not (tmp_path / "frames" / job_id).exists()
-    assert runs.count() == 0

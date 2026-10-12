@@ -1,6 +1,7 @@
 """One SQLite row per finished run, schema versioned by PRAGMA user_version."""
 
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Sequence
@@ -10,6 +11,7 @@ from pathlib import Path
 from .transcribe import Segment
 
 SCHEMA_VERSION = 3
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -172,10 +174,13 @@ class RunStore:
         blobs = [json.dumps(v) for v in (settings, machine, versions)]
         names = ", ".join((*_COLUMNS, *_JSON_COLUMNS))
         marks = ", ".join(["?"] * (len(_COLUMNS) + len(_JSON_COLUMNS)))
-        # Computed before the transaction, so a path outside the folder cannot lose the run.
-        frame_rows = [
-            (fields.get("id"), f.position, f.time, self._relative(f.path)) for f in frames
-        ]
+        # An image outside the database folder is dropped, never the run with its transcript.
+        frame_rows = []
+        for f in frames:
+            try:
+                frame_rows.append((fields.get("id"), f.position, f.time, self._relative(f.path)))
+            except ValueError:
+                log.warning("Dropped frame %s of run %s: outside the folder", f.path, fields["id"])
         with self._lock, self._db:
             self._db.execute(f"INSERT INTO runs ({names}) VALUES ({marks})", [*values, *blobs])
             self._db.executemany(

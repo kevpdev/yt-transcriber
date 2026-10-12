@@ -88,7 +88,7 @@ def test_crossfade_keeps_the_target_screen_not_the_blend():
     assert np.array_equal(kept[1][1], OTHER_SLIDE)
 
 
-def test_bullet_reveal_keeps_the_fullest_version(monkeypatch):
+def test_two_screens_on_one_template_are_both_selected_without_dedupe(monkeypatch):
     # Same-template slides sit within HASH_DISTANCE of each other, so the current threshold
     # would dedupe the reveal. That is the calibration of #53, this test checks the selection.
     monkeypatch.setattr(frames, "HASH_DISTANCE", 0)
