@@ -20,6 +20,25 @@
 const $ = (id) => document.getElementById(id);
 const STAGES = { queued: "En attente", downloading: "Téléchargement de l'audio", transcribing: "Transcription" };
 let timer = null;
+let finished = null;
+
+function formatTime(seconds) {
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+  const ss = String(total % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function timedText(segments) {
+  return segments.map((s) => `[${formatTime(s.start)}] ${s.text}`).join("\n");
+}
+
+function render() {
+  if (!finished) return;
+  const timed = $("timestamps").getAttribute("aria-pressed") === "true";
+  $("out").value = timed ? timedText(finished.segments) : finished.text;
+}
 
 function setBusy(busy) { $("go").disabled = busy; }
 function showError(msg) { $("error").textContent = msg || ""; }
@@ -62,7 +81,8 @@ async function poll(id, failures = 0) {
   }
   showError("");
   if (job.stage === "done") {
-    $("out").value = job.text;
+    finished = job;
+    render();
     $("status").textContent = "Terminé.";
     return stop();
   }
@@ -79,6 +99,7 @@ $("form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   clearTimeout(timer);
   showError("");
+  finished = null;
   $("out").value = "";
   setBusy(true);
   try {
@@ -108,6 +129,12 @@ if (resumed) {
   $("status").textContent = "Reprise du job en cours…";
   poll(resumed);
 }
+
+$("timestamps").addEventListener("click", () => {
+  const pressed = $("timestamps").getAttribute("aria-pressed") === "true";
+  $("timestamps").setAttribute("aria-pressed", String(!pressed));
+  render();
+});
 
 $("copy").addEventListener("click", async () => {
   const text = $("out").value;
