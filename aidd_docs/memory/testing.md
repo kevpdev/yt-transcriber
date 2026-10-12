@@ -15,7 +15,8 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 ## Conventions
 
-- Tests live in `tests/`, one file per module under test (`test_jobs.py`, `test_urls.py`).
+- Tests live in `tests/`, one file per module under test (`test_jobs.py`, `test_urls.py`, `test_runs.py`).
+- `create_app` takes a `RunStore`, `RunStore(":memory:")` by default, so tests never write a file.
 - Names read as behavior, for example `test_second_job_while_running_gives_409_then_frees`.
 - Jobs run in a thread, so tests poll with a `wait_for` helper instead of sleeping a fixed time.
 
@@ -37,4 +38,4 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 - Entry: `http://localhost:8000`, started with `docker compose up --build`.
 - Auth: none.
-- State: no fixtures. Jobs live in memory, `docker compose restart` resets them.
+- State: no fixtures. Jobs live in memory, `docker compose restart` resets them. Finished runs stay in the `runs-data` volume, `docker compose down -v` deletes them.
