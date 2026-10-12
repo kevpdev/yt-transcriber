@@ -49,6 +49,7 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
         t_download = t_transcribe = None
         meta = None
         result = None
+        error = None
         try:
             store.set_stage(job, j.DOWNLOADING)
             with tempfile.TemporaryDirectory() as tmp:
@@ -57,40 +58,45 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
                 store.set_stage(job, j.TRANSCRIBING)
                 result = transcriber.run(meta.path, lambda p: store.set_progress(job, p))
                 t_transcribe = time.monotonic() - t0 - t_download
-            store.finish(job, result.text)
         except AudioError as exc:
-            store.fail(job, str(exc))
+            error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
-            store.fail(job, f"Erreur inattendue pendant la transcription : {exc}")
-        finally:
-            try:
-                runs.record(
-                    id=job.id,
-                    video_id=video_id,
-                    url=url,
-                    title=meta.title if meta else None,
-                    channel=meta.channel if meta else None,
-                    video_duration=meta.duration if meta else None,
-                    state=job.stage,
-                    error=job.error or None,
-                    text=result.text if result and job.stage == j.DONE else None,
-                    word_count=len(result.text.split()) if result and job.stage == j.DONE else None,
-                    char_count=len(result.text) if result and job.stage == j.DONE else None,
-                    language=result.language if result else None,
-                    language_probability=result.language_probability if result else None,
-                    started_at=started_at,
-                    download_s=t_download,
-                    transcribe_s=t_transcribe,
-                    total_s=time.monotonic() - t0,
-                    speed_ratio=meta.duration / t_transcribe
-                    if meta and meta.duration and t_transcribe
-                    else None,
-                    settings=settings(),
-                    machine=env.get("machine", {}),
-                    versions=env.get("versions", {}),
-                )
-            except Exception:  # noqa: BLE001 - a storage failure never changes the job
-                log.exception("Could not record run %s", job.id)
+            error = f"Erreur inattendue pendant la transcription : {exc}"
+        done = error is None and result is not None
+        # The row is written before the job is published as finished, so a reader that sees
+        # done or error finds the run in the database.
+        try:
+            runs.record(
+                id=job.id,
+                video_id=video_id,
+                url=url,
+                title=meta.title if meta else None,
+                channel=meta.channel if meta else None,
+                video_duration=meta.duration if meta else None,
+                state=j.DONE if done else j.ERROR,
+                error=error,
+                text=result.text if done and result else None,
+                word_count=len(result.text.split()) if done and result else None,
+                char_count=len(result.text) if done and result else None,
+                language=result.language if result else None,
+                language_probability=result.language_probability if result else None,
+                started_at=started_at,
+                download_s=t_download,
+                transcribe_s=t_transcribe,
+                total_s=time.monotonic() - t0,
+                speed_ratio=meta.duration / t_transcribe
+                if meta and meta.duration and t_transcribe
+                else None,
+                settings=settings(),
+                machine=env.get("machine", {}),
+                versions=env.get("versions", {}),
+            )
+        except Exception:  # noqa: BLE001 - a storage failure never changes the job
+            log.exception("Could not record run %s", job.id)
+        if done and result:
+            store.finish(job, result.text)
+        else:
+            store.fail(job, error or "Erreur inattendue pendant la transcription.")
 
     @app.post("/jobs", status_code=202)
     def create_job(req: JobRequest):

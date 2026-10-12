@@ -12,13 +12,8 @@ from app.transcribe import settings
 from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 
 
-def wait_for_rows(runs, count):
-    for _ in range(100):
-        rows = runs.query("SELECT COUNT(*) FROM runs")
-        if rows[0][0] >= count:
-            return
-        time.sleep(0.02)
-    raise AssertionError("run not recorded")
+def count_rows(runs):
+    return runs.query("SELECT COUNT(*) FROM runs")[0][0]
 
 
 def test_successful_run_is_recorded_with_its_telemetry():
@@ -26,7 +21,7 @@ def test_successful_run_is_recorded_with_its_telemetry():
     with TestClient(create_app(FakeTranscriber(), fake_download, runs)) as client:
         job_id = client.post("/jobs", json={"url": URL}).json()["id"]
         assert wait_for(client, job_id)["stage"] == j.DONE
-        wait_for_rows(runs, 1)
+        assert count_rows(runs) == 1
     row = runs.query(
         "SELECT id, state, text, word_count, language, title, channel, video_duration, "
         "download_s, total_s, json_extract(settings, '$.model'), "
@@ -49,7 +44,7 @@ def test_failed_run_is_recorded_with_its_error_and_no_transcript():
     runs = RunStore(":memory:")
     client = TestClient(create_app(FakeTranscriber(), failing, runs))
     wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
-    wait_for_rows(runs, 1)
+    assert count_rows(runs) == 1
     assert runs.query("SELECT state, error, text, language, transcribe_s FROM runs") == [
         ("error", "Impossible de télécharger l'audio : Video unavailable", None, None, None)
     ]
@@ -59,9 +54,9 @@ def test_two_jobs_give_two_rows():
     runs = RunStore(":memory:")
     client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
     wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
-    wait_for_rows(runs, 1)
+    assert count_rows(runs) == 1
     wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
-    wait_for_rows(runs, 2)
+    assert count_rows(runs) == 2
     assert runs.query("SELECT state FROM runs") == [("done",), ("done",)]
 
 

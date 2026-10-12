@@ -69,6 +69,9 @@ class RunStore:
                 self._db.commit()
 
     def record(self, *, settings: dict, machine: dict, versions: dict, **fields) -> None:
+        unknown = set(fields) - set(_COLUMNS)
+        if unknown:
+            raise TypeError(f"Unknown run columns: {sorted(unknown)}")
         values = [fields.get(c) for c in _COLUMNS]
         blobs = [json.dumps(v) for v in (settings, machine, versions)]
         names = ", ".join((*_COLUMNS, *_JSON_COLUMNS))
