@@ -1,6 +1,6 @@
 ---
 objective: "Un agent retrouve par l'API le dernier run, un run choisi ou la liste des runs passés, avec leurs segments et une vue Markdown horodatée, sans connaître l'identifiant du job."
-status: implemented
+status: reviewed
 ---
 
 # Plan: Lister les runs et lire le dernier
@@ -28,3 +28,4 @@ status: implemented
 | La liste rend un résumé par run (sans `text`, sans segments, sans JSON de télémétrie), le détail rend tout | une page de 20 runs de 56 min resterait lourde avec le texte complet |
 | Vue Markdown à `GET /runs/{id}/markdown`, `text/markdown`, titre puis une ligne `[mm:ss] texte` par segment, `[h:mm:ss]` dès une heure | l'ADR veut une vue calculée à la demande, le format reprend `formatTime` de `app/static/app.js` |
 | `/runs/latest` est déclaré avant `/runs/{id}` | sinon FastAPI lit `latest` comme un identifiant |
+| `/runs/latest` rend le run `done` le plus récent, `404 Aucun run réussi.` sinon. `/runs` liste tous les runs, erreurs comprises | un agent relit un transcript, un run en erreur n'en a pas. Décidé par l'orchestrateur après la première revue, l'issue ne tranchait pas |

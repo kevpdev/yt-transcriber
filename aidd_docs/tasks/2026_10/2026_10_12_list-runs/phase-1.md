@@ -1,5 +1,5 @@
 ---
-status: pending
+status: implemented
 ---
 
 # Instruction: Lecture des runs, routes, vue Markdown, tests et mémoire
@@ -25,8 +25,8 @@ status: pending
 
 ```mermaid
 flowchart TD
-  A["Agent : GET /runs/latest"] --> B{"Un run existe ?"}
-  B -->|"non"| C["404 Aucun run."]
+  A["Agent : GET /runs/latest"] --> B{"Un run done existe ?"}
+  B -->|"aucun run done"| C["404 Aucun run réussi."]
   B -->|"oui"| D["Détail : métadonnées, télémétrie, segments"]
   D --> E["GET /runs/{id}/markdown"]
   E --> F["Une ligne [mm:ss] texte par segment"]
@@ -64,7 +64,7 @@ journey
 
 1. `list_runs(limit, offset)` rend les résumés triés par `started_at DESC, rowid DESC`, plus `count()`.
 2. `get_run(id)` rend toutes les colonnes, `settings`, `machine`, `versions` décodés en objets, et `segments` dans l'ordre de `position`, ou `None`.
-3. `latest_id()` rend l'id du run le plus récent, ou `None`.
+3. `latest_id()` rend l'id du run `done` le plus récent, ou `None`.
 4. `to_markdown(run)` rend `# <titre ou video_id>`, une ligne vide, puis une ligne `[mm:ss] texte` par segment (`[h:mm:ss]` dès 3600 s).
 
 ### `2)` Routes
@@ -72,7 +72,7 @@ journey
 > Exposer la lecture en suivant les contrats de `api.md`.
 
 1. `GET /runs` avec `limit`, `offset`, `422` en français si hors bornes ou non entiers.
-2. `GET /runs/latest`, `404 {"detail": "Aucun run."}` sur base vide.
+2. `GET /runs/latest`, `404 {"detail": "Aucun run réussi."}` sans run `done`.
 3. `GET /runs/{id}`, `404 {"detail": "Run inconnu."}`.
 4. `GET /runs/{id}/markdown`, `text/markdown; charset=utf-8`, même `404`.
 

@@ -37,3 +37,51 @@
 | Files checked | app/main.py, app/runs.py, tests/test_runs.py, README.md, aidd_docs/memory/api.md, aidd_docs/memory/codebase-map.md, aidd_docs/memory/architecture.md, aidd_docs/memory/internal/decisions/run-storage.md, aidd_docs/tasks/2026_10/2026_10_12_list-runs/plan.md, aidd_docs/tasks/2026_10/2026_10_12_list-runs/phase-1.md |
 | Unchecked     | none |
 | Unplanned     | `aidd_docs/tasks/2026_10/2026_10_12_list-runs/backlog-link.json` (lien vers #49, artefact du skill de plan) |
+
+## Second pass
+
+- **Verdict**: approve
+- **Diff**: `main...feat/list-runs` (f51d3d3, c68e378, f91ea2e, 35748b2)
+- **Axes run**: code, functional, relevancy, puis challenge
+- **Date**: 2026_10_12
+- **Findings**: 0 critical, 0 warning, 5 minor
+- **Mesures**: `scripts/check.sh` rejoué dans `python:3.12-slim` : ruff OK, pyright 0 erreur, `68 passed`, `Total coverage: 91.74%`. Sonde `TestClient` sur `int_param` : `limit=` et `limit=1&limit=200` rendent `422`, `limit=05` rend `200`, `limit=%D9%A3` (chiffre arabe-indien 3) rend `200` avec `limit: 3`.
+- **Décision de l'orchestrateur** : `/runs/latest` rend le dernier run `done`. Elle ne contredit aucun critère de #49, puisque deux runs réussis donnent bien le second.
+
+### Constats de la première passe
+
+| # | Constat | État | Preuve |
+| --- | --- | --- | --- |
+| 1 | `/runs/latest` rend un run en erreur | corrigé | `app/runs.py:164` (`WHERE state = 'done'`), tests `test_latest_run_skips_a_failed_run_but_list_keeps_it`, `test_latest_run_is_404_when_only_a_failed_run_exists` |
+| 2 | `int_param` rend une sentinelle `JSONResponse` | corrigé | `app/main.py:125`, `HTTPException` et retour `-> int` |
+| 3 | `int()` accepte `1_0`, `+5` | corrigé | `app/main.py:129`, cas ajoutés à `tests/test_runs.py` (paramétrage 422) |
+| 4 | « un entier au moins 0 » | corrigé | `app/main.py:131`, « supérieur ou égal à » |
+| 5 | `api.md` pointe vers `app/jobs.py` seul | corrigé | `aidd_docs/memory/api.md:26` |
+| 6 | `codebase-map.md` dit que `runs.py` ne fait qu'écrire | corrigé | `aidd_docs/memory/codebase-map.md:17` |
+| 7 | README « Lire les derniers runs » passe par `sqlite3` | non traité | `README.md:40-44` inchangé, aucune trace dans 35748b2 |
+| 8 | Télémétrie peu contrainte dans le test de détail | corrigé | `tests/test_runs.py`, `machine` et `versions` en `dict`, `transcribe_s` numérique |
+
+### Findings
+
+| Sev | Kind | Phase | Location | Issue | Fix |
+| --- | ---- | ----- | -------- | ----- | --- |
+| 🟢 minor | fit | 1 | `README.md:40-44` | Constat 7 non traité : la voie documentée pour relire les derniers runs reste `docker compose exec … sqlite3`, alors que `GET /runs` et `/runs/latest` existent. | Ajouter `curl localhost:8000/runs/latest` et `curl localhost:8000/runs/<id>/markdown` comme voie principale, garder la requête SQL pour la télémétrie. |
+| 🟢 minor | rot | 1 | `app/main.py:154`, `README.md:67-68` | « terminé » désigne deux choses : `/runs` « liste les runs terminés » (erreurs comprises), mais `/runs/latest` répond « Aucun run terminé. » alors qu'un run en erreur existe. Un agent lit un message faux. | Écrire « Aucun run réussi. » dans `app/main.py:154`, `tests/test_runs.py:221` et `:251`, `README.md:68` et `aidd_docs/memory/api.md:15`. |
+| 🟢 minor | rot | 1 | `aidd_docs/tasks/2026_10/2026_10_12_list-runs/phase-1.md:29`, `:67`, `:75`, `plan.md:24-30` | Le plan contredit le code : `404 Aucun run.`, `latest_id()` « du run le plus récent », et la décision « dernier run `done` » n'est consignée dans aucune ligne de `Decisions`. `phase-1.md:2` reste `status: pending` alors que `plan.md:3` dit `implemented`. | Ajouter la décision au tableau `Decisions` de `plan.md`, aligner `phase-1.md:29`, `:67`, `:75`, passer `phase-1.md:2` à `implemented`. |
+| 🟢 minor | code | 1 | `app/main.py:129` | `\d` accepte les chiffres Unicode : `limit=%D9%A3` rend `200` avec `limit: 3`. | `re.fullmatch(r"-?[0-9]+", raw)`. |
+| 🟢 minor | rot | 1 | `aidd_docs/memory/api.md:26` | « The README API section and `app/main.py` and `app/jobs.py` » : double « and ». | « The README API section, `app/main.py` and `app/jobs.py` are the reference. » |
+
+### Challenge
+
+My confidence level of correctness now: 85%
+
+#### Correctness (100%)
+- Les cinq critères de #49 tiennent : ordre et `latest` après deux runs, détail complet et `404`, une ligne `[mm:ss]` par segment, tests des trois routes, `api.md` corrigé.
+- Un agent sans id de job relit le dernier transcript en deux appels, `GET /runs/latest` puis `GET /runs/{id}/markdown`. Un échec postérieur ne masque plus le dernier succès, et la liste garde les erreurs avec leur `state`.
+- `api.md`, `codebase-map.md` et la section API du README décrivent le code. `architecture.md` et `testing.md` ne deviennent pas faux.
+
+#### Deal breakers
+- Aucun.
+
+#### Suggestions (enhancements only)
+- Les cinq constats mineurs ci-dessus. Le plus utile à l'agent est le message « Aucun run réussi. », les autres touchent la doc et le plan.
