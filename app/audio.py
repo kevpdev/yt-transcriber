@@ -10,10 +10,10 @@ class AudioError(Exception):
     """Download failed, the message is meant for the end user."""
 
 
-def _readable(raw: str) -> str:
+def _readable(raw: str, subject: str = "l'audio") -> str:
     text = _ANSI.sub("", raw).strip().splitlines()[-1] if raw.strip() else ""
     text = re.sub(r"^ERROR:\s*(\[[^\]]+\]\s*)?([\w-]{11}:\s*)?", "", text)
-    return f"Impossible de télécharger l'audio : {text or 'erreur inconnue'}"
+    return f"Impossible de télécharger {subject} : {text or 'erreur inconnue'}"
 
 
 @dataclass
