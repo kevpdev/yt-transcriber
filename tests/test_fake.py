@@ -12,8 +12,9 @@ URL = "https://www.youtube.com/watch?v=KnXm3PbNz5A"
 
 
 @pytest.fixture(autouse=True)
-def instant(monkeypatch):
+def instant(monkeypatch, tmp_path):
     monkeypatch.setattr(fake, "FAKE_DURATION", 0.0)
+    monkeypatch.setenv("YT_DB", str(tmp_path / "runs.db"))
 
 
 def wait_for(client, job_id):
@@ -55,7 +56,7 @@ def test_fake_job_goes_through_downloading_transcribing_done_in_order(monkeypatc
 
 def test_fake_progress_is_increasing_and_ends_at_one(tmp_path):
     seen = []
-    FakeTranscriber().run(fake_download(URL, tmp_path), seen.append)
+    FakeTranscriber().run(fake_download(URL, tmp_path).path, seen.append)
     assert seen[-1] == 1.0 and seen == sorted(seen)
 
 

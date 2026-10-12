@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,15 @@ def _readable(raw: str) -> str:
     return f"Impossible de télécharger l'audio : {text or 'erreur inconnue'}"
 
 
-def download_audio(url: str, dest_dir: Path) -> Path:
+@dataclass
+class Download:
+    path: Path
+    title: str | None = None
+    channel: str | None = None
+    duration: float | None = None
+
+
+def download_audio(url: str, dest_dir: Path) -> Download:
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import DownloadError
 
@@ -29,6 +38,11 @@ def download_audio(url: str, dest_dir: Path) -> Path:
     try:
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            return Path(ydl.prepare_filename(info))
+            return Download(
+                path=Path(ydl.prepare_filename(info)),
+                title=info.get("title"),
+                channel=info.get("channel") or info.get("uploader"),
+                duration=info.get("duration"),
+            )
     except DownloadError as exc:
         raise AudioError(_readable(str(exc))) from exc
