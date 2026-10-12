@@ -221,6 +221,19 @@ def test_unknown_level_gives_422_in_french_and_takes_no_job():
     assert client.post("/jobs", json={"url": URL}).status_code == 202
 
 
+@pytest.mark.parametrize("level", [1, ["frames"], ""])
+def test_non_string_or_empty_level_gives_the_french_422(level):
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    resp = client.post("/jobs", json={"url": URL, "level": level})
+    assert resp.status_code == 422
+    assert resp.json() == {"detail": "Le niveau doit être text ou frames."}
+
+
+def test_null_level_means_text():
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    assert client.post("/jobs", json={"url": URL, "level": None}).status_code == 202
+
+
 def test_runs_list_carries_the_level_of_each_run():
     client = TestClient(create_app(FakeTranscriber(), fake_download))
     wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])

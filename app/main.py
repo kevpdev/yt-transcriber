@@ -8,6 +8,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -32,7 +33,8 @@ LEVELS = ("text", "frames")
 
 class JobRequest(BaseModel):
     url: str = ""
-    level: str = "text"
+    # Any type: a null or a number gets the French 422 below, not the pydantic one.
+    level: Any = None
 
 
 def create_app(
@@ -82,8 +84,8 @@ def create_app(
                 t_transcribe = time.monotonic() - t0 - t_download
                 if job.frames:
                     store.set_stage(job, j.EXTRACTING)
-                if job.frames and runs.frames_dir:
-                    images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
+                    if runs.frames_dir:
+                        images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
         except AudioError as exc:
             error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
@@ -135,12 +137,13 @@ def create_app(
             video_id = parse_video_id(req.url)
         except InvalidUrl as exc:
             return JSONResponse({"detail": str(exc)}, status_code=422)
-        if req.level not in LEVELS:
+        level = "text" if req.level is None else req.level
+        if level not in LEVELS:
             return JSONResponse(
                 {"detail": f"Le niveau doit être {' ou '.join(LEVELS)}."}, status_code=422
             )
         try:
-            job = store.start(frames=req.level == "frames")
+            job = store.start(frames=level == "frames")
         except j.JobBusy as exc:
             return JSONResponse({"detail": str(exc)}, status_code=409)
         threading.Thread(
