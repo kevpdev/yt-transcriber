@@ -90,11 +90,12 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
                 settings=settings(),
                 machine=env.get("machine", {}),
                 versions=env.get("versions", {}),
+                segments=result.segments if done and result else (),
             )
         except Exception:  # noqa: BLE001 - a storage failure never changes the job
             log.exception("Could not record run %s", job.id)
         if done and result:
-            store.finish(job, result.text)
+            store.finish(job, result.text, result.segments)
         else:
             store.fail(job, error or "Erreur inattendue pendant la transcription.")
 

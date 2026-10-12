@@ -1,6 +1,6 @@
 import os
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 MODEL = "large-v3-turbo"
@@ -27,8 +27,16 @@ def settings() -> dict:
 
 
 @dataclass
+class Segment:
+    start: float
+    end: float
+    text: str
+
+
+@dataclass
 class Transcript:
     text: str
+    segments: list[Segment] = field(default_factory=list)
     language: str | None = None
     language_probability: float | None = None
 
@@ -53,13 +61,16 @@ class Transcriber:
             condition_on_previous_text=CONDITION_ON_PREVIOUS_TEXT,
             hotwords=hotwords(),
         )
-        parts = []
+        kept = []
         for segment in segments:
-            parts.append(segment.text.strip())
+            text = segment.text.strip()
+            if text:
+                kept.append(Segment(start=segment.start, end=segment.end, text=text))
             if info.duration:
                 on_progress(min(segment.end / info.duration, 1.0))
         return Transcript(
-            text=" ".join(p for p in parts if p),
+            text=" ".join(s.text for s in kept),
+            segments=kept,
             language=info.language,
             language_probability=info.language_probability,
         )

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app import jobs as j
 from app.audio import AudioError, Download
 from app.main import create_app
-from app.transcribe import Transcript
+from app.transcribe import Segment, Transcript
 
 URL = "https://www.youtube.com/watch?v=gsxiFd8AZQU"
 
@@ -22,7 +22,12 @@ class FakeTranscriber:
         on_progress(0.5)
         if self.gate:
             self.gate.wait(5)
-        return Transcript(text="bonjour le monde", language="fr", language_probability=0.99)
+        return Transcript(
+            text="bonjour le monde",
+            segments=[Segment(0.0, 1.5, "bonjour"), Segment(1.5, 3.0, "le monde")],
+            language="fr",
+            language_probability=0.99,
+        )
 
 
 def fake_download(url, dest):
@@ -63,6 +68,26 @@ def test_happy_path_returns_raw_text():
     assert (
         body["stage"] == j.DONE and body["text"] == "bonjour le monde" and body["progress"] == 1.0
     )
+
+
+def test_done_job_exposes_timed_segments_and_keeps_text():
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    body = wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
+    assert body["text"] == "bonjour le monde"
+    assert body["segments"] == [
+        {"start": 0.0, "end": 1.5, "text": "bonjour"},
+        {"start": 1.5, "end": 3.0, "text": "le monde"},
+    ]
+
+
+def test_running_job_has_no_segments_yet():
+    gate = threading.Event()
+    client = TestClient(create_app(FakeTranscriber(gate), fake_download))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    body = wait_for(client, job_id, stages=(j.TRANSCRIBING,))
+    assert body["segments"] == []
+    gate.set()
+    wait_for(client, job_id)
 
 
 def test_invalid_url_gives_422_and_app_keeps_running():

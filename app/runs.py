@@ -5,9 +5,9 @@ import sqlite3
 import threading
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-_SCHEMA = """
+_RUNS_SCHEMA = """
 CREATE TABLE runs (
     id TEXT PRIMARY KEY,
     video_id TEXT NOT NULL,
@@ -30,6 +30,17 @@ CREATE TABLE runs (
     settings TEXT,
     machine TEXT,
     versions TEXT
+)
+"""
+
+_SEGMENTS_SCHEMA = """
+CREATE TABLE segments (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    position INTEGER NOT NULL,
+    start REAL NOT NULL,
+    end REAL NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY (run_id, position)
 )
 """
 
@@ -63,12 +74,27 @@ class RunStore:
         self._lock = threading.Lock()
         self._db = sqlite3.connect(path, check_same_thread=False)
         with self._lock:
-            if self._db.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
-                self._db.execute(_SCHEMA)
-                self._db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-                self._db.commit()
+            self._migrate()
 
-    def record(self, *, settings: dict, machine: dict, versions: dict, **fields) -> None:
+    def _migrate(self) -> None:
+        """Apply the missing steps in one transaction, never dropping existing data."""
+        version = self._db.execute("PRAGMA user_version").fetchone()[0]
+        if version >= SCHEMA_VERSION:
+            return
+        # executescript commits first, so the transaction is opened inside the script.
+        steps = []
+        if version < 1:
+            steps.append(_RUNS_SCHEMA)
+        if version < 2:
+            steps.append(_SEGMENTS_SCHEMA)
+        script = ";\n".join(steps)
+        self._db.executescript(
+            f"BEGIN;\n{script};\nPRAGMA user_version = {SCHEMA_VERSION};\nCOMMIT;"
+        )
+
+    def record(
+        self, *, settings: dict, machine: dict, versions: dict, segments=(), **fields
+    ) -> None:
         unknown = set(fields) - set(_COLUMNS)
         if unknown:
             raise TypeError(f"Unknown run columns: {sorted(unknown)}")
@@ -78,6 +104,10 @@ class RunStore:
         marks = ", ".join(["?"] * (len(_COLUMNS) + len(_JSON_COLUMNS)))
         with self._lock, self._db:
             self._db.execute(f"INSERT INTO runs ({names}) VALUES ({marks})", [*values, *blobs])
+            self._db.executemany(
+                "INSERT INTO segments (run_id, position, start, end, text) VALUES (?, ?, ?, ?, ?)",
+                [(fields.get("id"), i, s.start, s.end, s.text) for i, s in enumerate(segments)],
+            )
 
     def query(self, sql: str, params: tuple = ()) -> list[tuple]:
         with self._lock:

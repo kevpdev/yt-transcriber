@@ -32,6 +32,16 @@ def test_fake_pair_runs_a_job_to_done_with_fake_text():
     job_id = client.post("/jobs", json={"url": URL}).json()["id"]
     body = wait_for(client, job_id)
     assert (body["stage"], body["text"], body["progress"]) == (j.DONE, FAKE_TEXT, 1.0)
+    assert " ".join(s["text"] for s in body["segments"]) == FAKE_TEXT
+
+
+def test_fake_segments_join_to_the_fake_text_and_span_the_duration(monkeypatch):
+    monkeypatch.setattr(fake, "FAKE_DURATION", 10.0)
+    segments = fake.fake_segments()
+    assert " ".join(s.text for s in segments) == FAKE_TEXT
+    assert segments[0].start == 0.0 and segments[-1].end == fake.FAKE_DURATION
+    assert all(a.end == b.start for a, b in zip(segments, segments[1:], strict=False))
+    assert all(s.start < s.end for s in segments)
 
 
 def test_fake_job_goes_through_downloading_transcribing_done_in_order(monkeypatch):
@@ -42,9 +52,9 @@ def test_fake_job_goes_through_downloading_transcribing_done_in_order(monkeypatc
         seen.append(stage)
         set_stage(self, job, stage, progress)
 
-    def spy_finish(self, job, text):
+    def spy_finish(self, job, text, segments=None):
         seen.append(j.DONE)
-        finish(self, job, text)
+        finish(self, job, text, segments)
 
     monkeypatch.setattr(j.JobStore, "set_stage", spy_set_stage)
     monkeypatch.setattr(j.JobStore, "finish", spy_finish)
