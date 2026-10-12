@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import tempfile
 import threading
 import time
@@ -7,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -121,30 +122,23 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
             return JSONResponse({"detail": "Job inconnu."}, status_code=404)
         return job.view()
 
-    def int_param(request: Request, name: str, default: int, low: int, high: int | None):
+    def int_param(request: Request, name: str, default: int, low: int, high: int | None) -> int:
         raw = request.query_params.get(name)
         if raw is None:
             return default
-        try:
-            value = int(raw)
-        except ValueError:
-            value = None
+        value = int(raw) if re.fullmatch(r"-?\d+", raw) else None
         if value is None or value < low or (high is not None and value > high):
-            bounds = f"entre {low} et {high}" if high is not None else f"au moins {low}"
-            return JSONResponse(
-                {"detail": f"Le paramètre {name} doit être un entier {bounds}."},
+            bounds = f"entre {low} et {high}" if high is not None else f"supérieur ou égal à {low}"
+            raise HTTPException(
                 status_code=422,
+                detail=f"Le paramètre {name} doit être un entier {bounds}.",
             )
         return value
 
     @app.get("/runs")
     def list_runs(request: Request):
         limit = int_param(request, "limit", 20, 1, 100)
-        if isinstance(limit, JSONResponse):
-            return limit
         offset = int_param(request, "offset", 0, 0, None)
-        if isinstance(offset, JSONResponse):
-            return offset
         return {
             "runs": runs.list_runs(limit, offset),
             "total": runs.count(),
@@ -157,7 +151,7 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
         run_id = runs.latest_id()
         run = runs.get_run(run_id) if run_id else None
         if run is None:
-            return JSONResponse({"detail": "Aucun run."}, status_code=404)
+            return JSONResponse({"detail": "Aucun run terminé."}, status_code=404)
         return run
 
     @app.get("/runs/{run_id}")

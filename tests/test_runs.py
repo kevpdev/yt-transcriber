@@ -196,6 +196,31 @@ def test_latest_run_is_the_second_and_list_is_newest_first():
     assert "text" not in body["runs"][0] and "segments" not in body["runs"][0]
 
 
+def failing_download(url, dest):
+    raise AudioError("Impossible de télécharger l'audio : Video unavailable")
+
+
+def test_latest_run_skips_a_failed_run_but_list_keeps_it():
+    runs = RunStore(":memory:")
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs))
+    ok = client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(client, ok)
+    bad_client = TestClient(create_app(FakeTranscriber(), failing_download, runs))
+    bad = bad_client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(bad_client, bad)
+    assert client.get("/runs/latest").json()["id"] == ok
+    assert [r["id"] for r in client.get("/runs").json()["runs"]] == [bad, ok]
+
+
+def test_latest_run_is_404_when_only_a_failed_run_exists():
+    runs = RunStore(":memory:")
+    client = TestClient(create_app(FakeTranscriber(), failing_download, runs))
+    wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
+    response = client.get("/runs/latest")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Aucun run terminé."}
+
+
 def test_run_detail_has_metadata_telemetry_and_ordered_segments():
     client, (first, _) = two_runs()
     run = client.get(f"/runs/{first}").json()
@@ -203,7 +228,8 @@ def test_run_detail_has_metadata_telemetry_and_ordered_segments():
     assert run["text"] == "bonjour le monde"
     assert run["settings"]["model"] == settings()["model"]
     assert run["total_s"] >= 0
-    assert isinstance(run["machine"], dict | None) and isinstance(run["versions"], dict)
+    assert isinstance(run["machine"], dict) and isinstance(run["versions"], dict)
+    assert isinstance(run["transcribe_s"], int | float) and run["transcribe_s"] >= 0
     assert run["segments"] == [
         {"start": 0.0, "end": 1.5, "text": "bonjour"},
         {"start": 1.5, "end": 3.0, "text": "le monde"},
@@ -222,7 +248,7 @@ def test_latest_run_on_empty_database_is_404():
     client = TestClient(create_app(FakeTranscriber(), fake_download, RunStore(":memory:")))
     response = client.get("/runs/latest")
     assert response.status_code == 404
-    assert response.json() == {"detail": "Aucun run."}
+    assert response.json() == {"detail": "Aucun run terminé."}
 
 
 def test_markdown_view_has_a_title_and_one_timed_line_per_segment():
@@ -257,7 +283,10 @@ def test_runs_list_paginates_with_limit_and_offset():
     assert (body["total"], body["limit"], body["offset"]) == (2, 1, 1)
 
 
-@pytest.mark.parametrize("query", ["limit=0", "limit=101", "offset=-1", "limit=abc", "offset=1.5"])
+@pytest.mark.parametrize(
+    "query",
+    ["limit=0", "limit=101", "offset=-1", "limit=abc", "offset=1.5", "limit=1_0", "offset=+5"],
+)
 def test_runs_list_rejects_invalid_pagination_with_422(query):
     client = TestClient(create_app(FakeTranscriber(), fake_download, RunStore(":memory:")))
     response = client.get(f"/runs?{query}")

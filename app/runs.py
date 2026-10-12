@@ -161,7 +161,8 @@ class RunStore:
     def latest_id(self) -> str | None:
         with self._lock:
             row = self._db.execute(
-                "SELECT id FROM runs ORDER BY started_at DESC, rowid DESC LIMIT 1"
+                "SELECT id FROM runs WHERE state = 'done' "
+                "ORDER BY started_at DESC, rowid DESC LIMIT 1"
             ).fetchone()
         return row[0] if row else None
 
