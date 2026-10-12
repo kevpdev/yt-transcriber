@@ -65,7 +65,7 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 - `POST /jobs` avec `{"url": "..."}` renvoie `202 {"id"}`, `422` si l'URL est invalide, `409` si un job tourne déjà.
 - `GET /jobs/{id}` renvoie `{id, stage, progress, text, segments, error}`. `segments` est la liste des `{start, end, text}` du job terminé (secondes depuis le début), vide tant qu'il n'est pas `done`.
 - `GET /runs?limit=&offset=` liste les runs terminés, du plus récent au plus ancien. `limit` de 1 à 100 (20 par défaut), `offset` au moins 0, sinon `422`. Renvoie `{runs, total, limit, offset}`, chaque run étant un résumé (`id, video_id, url, title, channel, video_duration, state, language, word_count, started_at, total_s`).
-- `GET /runs/latest` renvoie le dernier run en entier, `404` s'il n'y en a aucun.
+- `GET /runs/latest` renvoie le dernier run terminé avec succès (état `done`) en entier, `404 {"detail": "Aucun run terminé."}` s'il n'y en a aucun.
 - `GET /runs/{id}` renvoie le run complet (métadonnées, télémétrie, `text`, `segments`), `404` si l'id est inconnu.
 - `GET /runs/{id}/markdown` renvoie le transcript en `text/markdown` : un titre, puis une ligne `[mm:ss] texte` par segment (`[h:mm:ss]` dès une heure).
 
