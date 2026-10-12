@@ -26,7 +26,7 @@ flowchart TD
 - The model loads once at startup, in the FastAPI lifespan, and the page is served only after that.
 - A job runs in a thread and the page polls every 2 s, so no request waits for minutes.
 - One job at a time, because there is one GPU. The second request gets `409`.
-- Jobs live in memory only, the last 20 are kept, and a restart loses them.
+- Jobs live in memory only for now, the last 20 are kept, and a restart loses them. `internal/decisions/run-storage.md` keeps every finished run in SQLite instead, delivered by #8.
 - No language select. Whisper detects the language and translation is left to the downstream skill.
 - yt-dlp is locked in `uv.lock` and upgraded at build, so a `--no-cache` rebuild still follows YouTube changes.
 - A change that departs from the ADR needs a new ADR first.
