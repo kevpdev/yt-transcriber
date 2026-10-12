@@ -191,11 +191,12 @@ def spy_stages(monkeypatch):
     return stages
 
 
-def test_job_without_level_never_extracts_and_records_level_text(tmp_path, monkeypatch):
+@pytest.mark.parametrize("body", [{"url": URL}, {"url": URL, "level": None}])
+def test_job_without_level_never_extracts_and_records_level_text(body, tmp_path, monkeypatch):
     stages = spy_stages(monkeypatch)
     runs = RunStore(str(tmp_path / "runs.db"))
     client = TestClient(create_app(FakeTranscriber(), fake_download, runs, fake_capture))
-    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    job_id = client.post("/jobs", json=body).json()["id"]
     assert wait_for(client, job_id)["stage"] == j.DONE
     assert j.EXTRACTING not in stages
     run = client.get(f"/runs/{job_id}").json()
@@ -227,11 +228,6 @@ def test_non_string_or_empty_level_gives_the_french_422(level):
     resp = client.post("/jobs", json={"url": URL, "level": level})
     assert resp.status_code == 422
     assert resp.json() == {"detail": "Le niveau doit être text ou frames."}
-
-
-def test_null_level_means_text():
-    client = TestClient(create_app(FakeTranscriber(), fake_download))
-    assert client.post("/jobs", json={"url": URL, "level": None}).status_code == 202
 
 
 def test_runs_list_carries_the_level_of_each_run():
