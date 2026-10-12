@@ -11,5 +11,5 @@ Where the project runs and how it ships: CI/CD, environments, and release.
 
 - Local only, on `http://localhost:8000`.
 - The GPU is exposed through `deploy.resources.reservations.devices` in `compose.yaml`, which needs `nvidia-container-toolkit` on the host.
-- Settings are environment variables: `HOTWORDS`, `YT_DB` (the SQLite file, default `/data/runs.db`) and `HOST_DOCKER_VERSION` (recorded in the run telemetry, empty unless the host passes it, the container has no Docker socket).
+- Settings are environment variables: `HOTWORDS`, `YT_DB` (the SQLite file, default `/data/runs.db`, read by the app but not passed by `compose.yaml`) and `HOST_DOCKER_VERSION` (recorded in the run telemetry, empty unless the host passes it, the container has no Docker socket).
 - Two named volumes: `hf-cache` for the model, `runs-data` on `/data` for the run history. `docker compose down` keeps both, `down -v` deletes them.
