@@ -5,7 +5,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 ## Strategy
 
 - Unit and API-level tests in `tests/`, run without a GPU and without network.
-- `create_app` takes the transcriber and the downloader as arguments, so tests inject fakes and drive the real routes. `tests/test_jobs.py` defines its own `FakeTranscriber` and `fake_download`, and `app/fake.py` holds the pair that `YT_FAKE=1` and `tests/test_fake.py` use, plus `fake_capture` (two synthetic WebP files). `tests/test_frames.py` runs the frame selection on synthetic numpy images, without PyAV decoding or network.
+- `create_app` takes the transcriber and the downloader as arguments, so tests inject fakes and drive the real routes. `tests/test_jobs.py` defines its own `FakeTranscriber` and `fake_download`, and `app/fake.py` holds the pair that `YT_FAKE=1` and `tests/test_fake.py` use, plus `fake_capture` (two synthetic WebP files, after a pause of `FAKE_CAPTURE_DELAY` seconds so the browser sees the `extracting` stage, set to 0 for every test by `tests/conftest.py`). `tests/test_frames.py` runs the frame selection on synthetic numpy images, without PyAV decoding or network.
 - Browser end-to-end tests in `e2e/`, at two levels, see the E2E section. The `real` level is the check of the real Whisper model and yt-dlp path, on video `KnXm3PbNz5A`.
 
 ## Tools
@@ -26,7 +26,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 ## E2E
 
-- `e2e/` holds seven Playwright scenarios (invalid URL, reload during a job, brief network cut, unknown job, copy, timestamps toggle, theme toggle), the same suite at both levels. `scripts/e2e.sh` forwards `E2E_VIDEO_URL` and `E2E_LEVEL` (`fake` or `real`) to the container. `E2E_BASE_URL` only applies when pytest is run directly against another server.
+- `e2e/` holds eight Playwright scenarios (invalid URL, reload during a job, brief network cut, unknown job, copy, timestamps toggle, theme toggle, frames choice with the `extracting` stage), the same suite at both levels. `scripts/e2e.sh` forwards `E2E_VIDEO_URL` and `E2E_LEVEL` (`fake` or `real`) to the container. `E2E_BASE_URL` only applies when pytest is run directly against another server.
 - `scripts/e2e.sh fake`: Docker only. The app image runs with `YT_FAKE=1`, which swaps in the fake transcriber and downloader (a job takes about 10 s), and a Playwright container drives it.
 - `scripts/e2e.sh real`: Docker and the NVIDIA GPU. `docker compose up` runs the real model, the suite targets `KnXm3PbNz5A`.
 - `YT_FAKE` is read only in `build_app` and is never set by `compose.yaml`.

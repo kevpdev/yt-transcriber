@@ -31,11 +31,11 @@ Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
 
 ## Historique des runs
 
-Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `data/runs.db` dans le repo (monté sur `/data` dans le conteneur). La ligne garde la vidéo (identifiant, titre, chaîne, durée), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. Les segments horodatés d'un run réussi vont dans la table `segments` (`run_id`, `position`, `start`, `end`, `text`). Quand un job capture les images, chaque slide est un fichier WebP dans `data/frames/<run_id>/` et une ligne de la table `frames` (`run_id`, `position`, `time`, `path`, le chemin étant relatif à `data/`). `docker compose down` et `down -v` gardent l'historique, il s'efface avec `sudo rm -r data` (le fichier appartient à root).
+Chaque job terminé, réussi ou en erreur, ajoute une ligne à la table `runs` d'une base SQLite, `data/runs.db` dans le repo (monté sur `/data` dans le conteneur). La ligne garde la vidéo (identifiant, titre, chaîne, durée), le niveau (`text` ou `frames`), le résultat (état, erreur, texte, mots, caractères, langue), les temps, les réglages du modèle, la machine et les versions. Les segments horodatés d'un run réussi vont dans la table `segments` (`run_id`, `position`, `start`, `end`, `text`). Quand un job capture les images, chaque slide est un fichier WebP dans `data/frames/<run_id>/` et une ligne de la table `frames` (`run_id`, `position`, `time`, `path`, le chemin étant relatif à `data/`). `docker compose down` et `down -v` gardent l'historique, il s'efface avec `sudo rm -r data` (le fichier appartient à root).
 
 ### Capturer les slides à la main
 
-Le choix « avec images » dans la page et la route qui sert les fichiers viennent avec les issues #51 et #52. En attendant, la fonction que le job appellera se lance seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
+La page propose la case « Capturer les images » : cochée, le job passe par l'étape `extracting` après la transcription. La route qui sert les fichiers vient avec l'issue #52. La fonction de capture se lance aussi seule, sans GPU : elle télécharge le flux vidéo seul (720p au plus, AV1 puis VP9), garde un écran stable par slide sans doublon (`MAX_FRAMES` au plus, dans `app/frames.py`), écrit les WebP et supprime la vidéo.
 
 ```sh
 docker compose run --rm --no-deps yt-transcriber python -m app.frames https://www.youtube.com/watch?v=KnXm3PbNz5A /tmp/frames
@@ -78,9 +78,9 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 
 ## API
 
-- `POST /jobs` avec `{"url": "..."}` renvoie `202 {"id"}`, `422` si l'URL est invalide, `409` si un job tourne déjà.
-- `GET /jobs/{id}` renvoie `{id, stage, progress, text, segments, error}`. `segments` est la liste des `{start, end, text}` du job terminé (secondes depuis le début), vide tant qu'il n'est pas `done`.
-- `GET /runs?limit=&offset=` liste les runs terminés, du plus récent au plus ancien. `limit` de 1 à 100 (20 par défaut), `offset` au moins 0, sinon `422`. Renvoie `{runs, total, limit, offset}`, chaque run étant un résumé (`id, video_id, url, title, channel, video_duration, state, language, word_count, started_at, total_s`).
+- `POST /jobs` avec `{"url": "...", "level": "text"}` renvoie `202 {"id"}`. `level` est facultatif : `text` (défaut) ou `frames` pour capturer aussi les images. `422` si l'URL ou le niveau est invalide, `409` si un job tourne déjà.
+- `GET /jobs/{id}` renvoie `{id, stage, progress, text, segments, error}`. `stage` vaut `queued`, `downloading`, `transcribing`, `extracting` (niveau `frames` seulement), `done` ou `error`. `segments` est la liste des `{start, end, text}` du job terminé (secondes depuis le début), vide tant qu'il n'est pas `done`.
+- `GET /runs?limit=&offset=` liste les runs terminés, du plus récent au plus ancien. `limit` de 1 à 100 (20 par défaut), `offset` au moins 0, sinon `422`. Renvoie `{runs, total, limit, offset}`, chaque run étant un résumé (`id, video_id, url, title, channel, video_duration, state, level, language, word_count, started_at, total_s`).
 - `GET /runs/latest` renvoie le dernier run réussi (état `done`) en entier, `404 {"detail": "Aucun run réussi."}` s'il n'y en a aucun.
 - `GET /runs/{id}` renvoie le run complet (métadonnées, télémétrie, `text`, `segments`, `frames`, la liste des `{position, time, path}` des slides, vide sans capture), `404` si l'id est inconnu.
 - `GET /runs/{id}/markdown` renvoie le transcript en `text/markdown` : un titre, puis une ligne `[mm:ss] texte` par segment (`[h:mm:ss]` dès une heure).
