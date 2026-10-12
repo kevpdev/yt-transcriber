@@ -34,8 +34,11 @@ Refreshed automatically by the memory hook. Do not edit by hand.
 
 Read on demand:
 
+- [internal/decisions/frames-pyav.md](internal/decisions/frames-pyav.md)
+- [internal/decisions/generation-outside-app.md](internal/decisions/generation-outside-app.md)
 - [internal/decisions/lockfile.md](internal/decisions/lockfile.md)
 - [internal/decisions/page-files.md](internal/decisions/page-files.md)
+- [internal/decisions/run-storage.md](internal/decisions/run-storage.md)
 - [internal/decisions/stack.md](internal/decisions/stack.md)
 <!-- files:end -->
 

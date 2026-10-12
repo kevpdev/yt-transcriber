@@ -164,6 +164,8 @@ Conséquence sur le GPU : l'utilisateur et un agent partagent le même job uniqu
 
 ## ADR à écrire
 
+Écrits le 2026-10-12 : `run-storage.md`, `frames-pyav.md` et `generation-outside-app.md`, sous `aidd_docs/memory/internal/decisions/`.
+
 1. **Stockage des runs en SQLite** : remplace « Jobs live in memory only » pour les runs terminés, fixe le schéma, le volume, la rétention sans limite et les images en fichiers.
 2. **Capture des images avec PyAV** : flux vidéo seul 720p, détection et dédoublonnage avec PyAV (numpy ou `libavfilter`), plafond d'images, pas de binaire `ffmpeg`.
 3. **Deux portes d'usage et génération hors de l'app** : page pour l'humain, API pour l'agent, aucun LLM ni identifiant dans l'app, MCP différé.
