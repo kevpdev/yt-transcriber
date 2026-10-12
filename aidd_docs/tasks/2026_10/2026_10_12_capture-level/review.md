@@ -1,6 +1,6 @@
 # Review: capture-level (#51)
 
-- **Verdict**: changes-requested
+- **Verdict**: approve, after the fixes of 922a79f and ed2a739 (first pass: changes-requested)
 - **Diff**: `main...feat/capture-level` (edb0a17, a878c7d, 2e426d5)
 - **Axes run**: code, functional, relevancy
 - **Date**: 2026_10_12
@@ -43,3 +43,10 @@
 | Files checked | app/main.py, app/jobs.py, app/runs.py, app/fake.py, app/static/app.js, app/static/index.html, tests/conftest.py, tests/test_jobs.py, tests/test_runs.py, e2e/test_page.py, README.md, aidd_docs/memory/api.md, aidd_docs/memory/forms.md, aidd_docs/memory/architecture.md, aidd_docs/memory/testing.md, aidd_docs/memory/project-brief.md, aidd_docs/memory/internal/decisions/frames-pyav.md, aidd_docs/memory/internal/decisions/run-storage.md |
 | Unchecked     | none                                              |
 | Unplanned     | `RunStore.record` `setdefault("level", "text")` (`app/runs.py:179`), `create_app` sans paramètre `jobs` (permis par la tâche 2.4 de phase 1), fixture autouse `tests/conftest.py` (permise par la projection de phase 1) |
+
+## Second pass
+
+- Every finding is fixed, except the `setdefault` of `app/runs.py`, which was kept with its reason: it keeps `record` callable without `level`, and the SQL `DEFAULT` is required by the `ALTER TABLE ... NOT NULL`.
+- `scripts/check.sh`: `101 passed`, `Total coverage: 91.87%`. The page and `e2e/` did not change after the e2e run (`8 passed`).
+- Challenge against #51: 85 % confidence, no deal breaker. Remaining suggestions: log a skipped capture when the database is in memory, and signal a failed capture to the user with #52.
+- The `real` e2e level was not run (no GPU in the check). The new scenario assumes the extraction step stays shown for at least one 2 s poll.
