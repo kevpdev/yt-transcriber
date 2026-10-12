@@ -126,7 +126,7 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
         raw = request.query_params.get(name)
         if raw is None:
             return default
-        value = int(raw) if re.fullmatch(r"-?\d+", raw) else None
+        value = int(raw) if re.fullmatch(r"-?[0-9]+", raw) else None
         if value is None or value < low or (high is not None and value > high):
             bounds = f"entre {low} et {high}" if high is not None else f"supérieur ou égal à {low}"
             raise HTTPException(
@@ -151,7 +151,7 @@ def create_app(transcriber=None, download=download_audio, runs: RunStore | None 
         run_id = runs.latest_id()
         run = runs.get_run(run_id) if run_id else None
         if run is None:
-            return JSONResponse({"detail": "Aucun run terminé."}, status_code=404)
+            return JSONResponse({"detail": "Aucun run réussi."}, status_code=404)
         return run
 
     @app.get("/runs/{run_id}")

@@ -218,7 +218,7 @@ def test_latest_run_is_404_when_only_a_failed_run_exists():
     wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
     response = client.get("/runs/latest")
     assert response.status_code == 404
-    assert response.json() == {"detail": "Aucun run terminé."}
+    assert response.json() == {"detail": "Aucun run réussi."}
 
 
 def test_run_detail_has_metadata_telemetry_and_ordered_segments():
@@ -248,7 +248,7 @@ def test_latest_run_on_empty_database_is_404():
     client = TestClient(create_app(FakeTranscriber(), fake_download, RunStore(":memory:")))
     response = client.get("/runs/latest")
     assert response.status_code == 404
-    assert response.json() == {"detail": "Aucun run terminé."}
+    assert response.json() == {"detail": "Aucun run réussi."}
 
 
 def test_markdown_view_has_a_title_and_one_timed_line_per_segment():
