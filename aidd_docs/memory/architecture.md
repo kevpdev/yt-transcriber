@@ -27,7 +27,7 @@ flowchart TD
 - The model loads once at startup, in the FastAPI lifespan, and the page is served only after that.
 - A job runs in a thread and the page polls every 2 s, so no request waits for minutes.
 - One job at a time, because there is one GPU. The second request gets `409`.
-- The running job lives in memory for its progress, the last 20 jobs are kept there, and a restart loses them. Every finished run, done or error, is written as one row of `runs` in SQLite (`app/runs.py`) with its telemetry, see `internal/decisions/run-storage.md`. A storage failure is logged and never changes the job.
+- The running job lives in memory for its progress, the last 20 jobs are kept there, and a restart loses them. Every finished run, done or error, is written as one row of `runs` in SQLite (`app/runs.py`) with its telemetry, and a done run also writes its timed segments to the `segments` table in the same transaction (schema version 2, migrated step by step from version 1), see `internal/decisions/run-storage.md`. A storage failure is logged and never changes the job.
 - No language select. Whisper detects the language and translation is left to the downstream skill.
 - yt-dlp is locked in `uv.lock` and upgraded at build, so a `--no-cache` rebuild still follows YouTube changes.
 - A change that departs from the ADR needs a new ADR first.

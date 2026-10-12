@@ -4,7 +4,7 @@ What this project is, the problem it solves, and its domain language. The non-de
 
 ## What it is
 
-- A local tool for one user: paste a YouTube URL, get the raw transcript (no timestamps), copy it in one click.
+- A local tool for one user: paste a YouTube URL, get the transcript, plain or timestamped with one click, copy the displayed view in one click.
 - It runs on the user's own GPU, with no account, no quota and no paid service.
 
 ## Why it exists
@@ -24,6 +24,7 @@ What this project is, the problem it solves, and its domain language. The non-de
 ## Key features
 
 - Spoken language detected automatically, text returned in that language, never translated.
+- A button switches the transcript between plain text and one `[mm:ss] text` line per segment.
 - Progress shown per stage, with a percentage while transcribing.
 - One job at a time, a second request gets a clear message.
 - A page reload resumes the running job.
