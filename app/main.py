@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -11,10 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from . import contract as c
 from . import jobs as j
 from .audio import AudioError, download_audio
 from .fake import FakeTranscriber, fake_capture, fake_download
@@ -39,9 +41,14 @@ def with_frame_urls(run: dict) -> dict:
 
 
 class JobRequest(BaseModel):
-    url: str = ""
+    url: str = Field("", description="A YouTube video URL.")
     # Any type: a null or a number gets the French 422 below, not the pydantic one.
-    level: Any = None
+    # The enum is published in the schema only, it is checked by `create_job`.
+    level: Any = Field(
+        None,
+        description="`frames` also captures the slides. Missing or null means `text`.",
+        json_schema_extra={"enum": [*LEVELS, None], "default": "text"},
+    )
 
 
 def create_app(
@@ -81,6 +88,7 @@ def create_app(
         result = None
         images: list[Frame] = []
         error = None
+        log.info("Job %s started: %s, level %s", job.id, url, "frames" if job.frames else "text")
         try:
             store.set_stage(job, j.DOWNLOADING)
             with tempfile.TemporaryDirectory() as tmp:
@@ -94,8 +102,11 @@ def create_app(
                     if runs.frames_dir:
                         images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
         except AudioError as exc:
+            # The cause is the last line of the traceback, the header does not repeat it.
+            log.exception("Job %s failed to download", job.id)
             error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
+            log.exception("Job %s failed with an unexpected error", job.id)
             error = f"Erreur inattendue pendant la transcription : {exc}"
         done = error is None and result is not None
         # The row is written before the job is published as finished, so a reader that sees
@@ -133,12 +144,27 @@ def create_app(
             log.exception("Could not record run %s", job.id)
             if runs.frames_dir:
                 shutil.rmtree(runs.frames_dir / job.id, ignore_errors=True)
+        # Logged before the job is published, so a reader that sees it finished finds the line.
+        log.info(
+            "Job %s finished: %s in %.1f s",
+            job.id,
+            j.DONE if done else j.ERROR,
+            time.monotonic() - t0,
+        )
         if done and result:
             store.finish(job, result.text, result.segments)
         else:
             store.fail(job, error or "Erreur inattendue pendant la transcription.")
 
-    @app.post("/jobs", status_code=202)
+    @app.post(
+        "/jobs",
+        status_code=202,
+        responses={
+            202: {"model": c.JobCreated, "description": "Job queued, poll it with its id."},
+            409: c.error("A job is already running."),
+            422: c.error("Invalid YouTube URL or unknown level.", c.RequestError),
+        },
+    )
     def create_job(req: JobRequest):
         try:
             video_id = parse_video_id(req.url)
@@ -158,7 +184,10 @@ def create_app(
         ).start()
         return {"id": job.id}
 
-    @app.get("/jobs/{job_id}")
+    @app.get(
+        "/jobs/{job_id}",
+        responses={200: {"model": c.JobView}, 404: c.error("Unknown job.")},
+    )
     def get_job(job_id: str):
         job = store.get(job_id)
         if job is None:
@@ -178,7 +207,12 @@ def create_app(
             )
         return value
 
-    @app.get("/runs")
+    @app.get(
+        "/runs",
+        responses={200: {"model": c.RunList}, 422: c.error("Invalid limit or offset.")},
+        # Read by `int_param` and only declared here: a Query(int) would answer in English.
+        openapi_extra={"parameters": c.PAGINATION},
+    )
     def list_runs(request: Request):
         limit = int_param(request, "limit", 20, 1, 100)
         offset = int_param(request, "offset", 0, 0, None)
@@ -189,7 +223,10 @@ def create_app(
             "offset": offset,
         }
 
-    @app.get("/runs/latest")
+    @app.get(
+        "/runs/latest",
+        responses={200: {"model": c.Run}, 404: c.error("No run is done.")},
+    )
     def get_latest_run():
         run_id = runs.latest_id()
         run = runs.get_run(run_id) if run_id else None
@@ -197,14 +234,24 @@ def create_app(
             return JSONResponse({"detail": "Aucun run réussi."}, status_code=404)
         return with_frame_urls(run)
 
-    @app.get("/runs/{run_id}")
+    @app.get(
+        "/runs/{run_id}",
+        responses={200: {"model": c.Run}, 404: c.error("Unknown run.")},
+    )
     def get_run(run_id: str):
         run = runs.get_run(run_id)
         if run is None:
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
         return with_frame_urls(run)
 
-    @app.get("/runs/{run_id}/frames/{name}")
+    @app.get(
+        "/runs/{run_id}/frames/{name}",
+        response_class=Response,
+        responses={
+            200: c.content("image/webp", c.BINARY, "The image of one captured slide."),
+            404: c.error("Unknown run, or a name that is not an image of the run."),
+        },
+    )
     def get_run_frame(run_id: str, name: str):
         if not runs.has_run(run_id):
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
@@ -213,14 +260,30 @@ def create_app(
             return JSONResponse({"detail": "Image inconnue."}, status_code=404)
         return FileResponse(file, media_type="image/webp")
 
-    @app.get("/runs/{run_id}/markdown")
+    @app.get(
+        "/runs/{run_id}/markdown",
+        response_class=Response,
+        responses={
+            200: c.content(
+                "text/markdown",
+                c.TEXT,
+                "UTF-8. `# <title, or the video_id without one>`, a blank line, then one "
+                "`[mm:ss] text` line per segment, `[h:mm:ss]` from one hour.",
+            ),
+            404: c.error("Unknown run."),
+        },
+    )
     def get_run_markdown(run_id: str):
         run = runs.get_run(run_id)
         if run is None:
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
         return Response(to_markdown(run), media_type="text/markdown; charset=utf-8")
 
-    @app.get("/")
+    @app.get(
+        "/",
+        response_class=HTMLResponse,
+        responses={200: c.content("text/html", c.TEXT, "The page.")},
+    )
     def index():
         return FileResponse(STATIC / "index.html")
 
@@ -229,8 +292,23 @@ def create_app(
     return app
 
 
+def setup_logging() -> None:
+    """Send the INFO logs of the `app` package to stdout, read by `docker compose logs`.
+
+    Uvicorn configures only its own loggers: without this, an INFO line is lost and an
+    ERROR line goes out bare, through the `lastResort` handler of `logging`.
+    """
+    logger = logging.getLogger("app")
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        logger.addHandler(handler)
+
+
 def build_app() -> FastAPI:
     # started by `uvicorn --factory app.main:build_app`, tests import it without a GPU
+    setup_logging()
     runs = RunStore(os.environ.get("YT_DB", "/data/runs.db"))
     if os.environ.get("YT_FAKE") == "1":
         return create_app(FakeTranscriber(), fake_download, runs, fake_capture)

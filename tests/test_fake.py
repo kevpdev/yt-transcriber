@@ -1,3 +1,5 @@
+import logging
+import sys
 import time
 
 import pytest
@@ -75,6 +77,16 @@ def test_build_app_with_yt_fake_finishes_a_job(monkeypatch):
     client = TestClient(build_app())
     job_id = client.post("/jobs", json={"url": URL}).json()["id"]
     assert wait_for(client, job_id)["text"] == FAKE_TEXT
+
+
+def test_build_app_sends_app_logs_to_stdout_once(monkeypatch):
+    monkeypatch.setenv("YT_FAKE", "1")
+    logger = logging.getLogger("app")
+    logger.handlers.clear()
+    build_app()
+    build_app()
+    assert logger.level == logging.INFO
+    assert [getattr(h, "stream", None) for h in logger.handlers] == [sys.stdout]
 
 
 @pytest.mark.parametrize("value", [None, "0", "true", ""])
