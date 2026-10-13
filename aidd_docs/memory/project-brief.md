@@ -28,4 +28,7 @@ What this project is, the problem it solves, and its domain language. The non-de
 - Progress shown per stage, with a percentage while transcribing.
 - One job at a time, a second request gets a clear message.
 - A page reload resumes the running job.
+- The video (title, channel, duration) is shown as soon as yt-dlp knows it, before the audio download ends.
+- The text downloads as a `.txt` file, title first, in one click.
+- Hotwords are editable from the page, per job. `HOTWORDS` stays the default.
 - Slide capture on demand: a second submit button, « Transcrire avec les slides », adds the images to a job, as the `frames` level.

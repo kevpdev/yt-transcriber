@@ -14,9 +14,9 @@ Prérequis : Docker avec Compose, `nvidia-container-toolkit`, un GPU NVIDIA réc
 
 ## Utiliser
 
-1. Colle l'URL de la vidéo et clique sur « Transcrire », ou sur « Transcrire avec les slides » si tu veux aussi les images.
-2. La page affiche l'étape (téléchargement, transcription, puis extraction des images avec le second bouton) et le pourcentage de la transcription.
-3. Le texte arrive dans la grande zone. Le bouton aux deux feuilles superposées le copie.
+1. Colle l'URL de la vidéo et clique sur « Transcrire », ou sur « Transcrire avec les slides » si tu veux aussi les images. Le champ « Hotwords » est prérempli avec la valeur par défaut, tu peux l'adapter à la vidéo. La page garde ta dernière saisie.
+2. La page affiche l'étape (téléchargement, transcription, puis extraction des images avec le second bouton) et le pourcentage de la transcription. Dès que yt-dlp connaît la vidéo, une ligne montre son titre, sa chaîne et sa durée, pour vérifier que c'est la bonne avant d'attendre.
+3. Le texte arrive dans la grande zone. Le bouton aux deux feuilles superposées le copie, la flèche vers le bas le télécharge en `.txt` (le titre en première ligne, puis la vue affichée).
 
 La langue parlée est détectée automatiquement et le texte sort dans cette langue, sans traduction. Un seul job tourne à la fois, un second reçoit un message clair.
 
@@ -26,10 +26,10 @@ Quand un job échoue, la page affiche un message court. La cause complète est d
 
 | Variable   | Défaut                                | Rôle                                           |
 | ---------- | ------------------------------------- | ---------------------------------------------- |
-| `HOTWORDS` | `Claude Code, Claude, Anthropic, MCP` | termes tech que Whisper doit orthographier juste |
+| `HOTWORDS` | `Claude Code, Claude, Anthropic, MCP` | termes tech que Whisper doit orthographier juste, valeur par défaut du champ « Hotwords » de la page et de `POST /jobs` |
 | `HOST_DOCKER_VERSION` | vide | version de Docker gardée dans la télémétrie de chaque run, le conteneur ne peut pas la lire seul |
 
-Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`.
+Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`. Chaque job peut aussi porter ses propres hotwords, depuis le champ de la page ou le champ `hotwords` de `POST /jobs` (500 caractères au plus, vide ou absent veut dire la valeur par défaut, lue par `GET /hotwords`). La valeur utilisée est enregistrée dans les réglages du run.
 
 ## Historique des runs
 
@@ -77,7 +77,7 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 
 Le contrat est publié par l'app elle-même : `http://localhost:8000/openapi.json`, lisible dans `http://localhost:8000/docs`. Il donne chaque route, ses paramètres et le schéma de chaque réponse, succès et erreurs.
 
-- On lance un job avec `POST /jobs`, puis on interroge `GET /jobs/{id}` jusqu'à `done` ou `error`. Un seul job à la fois : le second reçoit `409`.
+- On lance un job avec `POST /jobs`, puis on interroge `GET /jobs/{id}` jusqu'à `done` ou `error`. Un seul job à la fois : le second reçoit `409`. `GET /jobs/{id}` publie aussi `title`, `channel` et `duration`, à `null` tant que le téléchargement ne connaît pas la vidéo, et `GET /hotwords` donne la valeur par défaut des hotwords.
 - Un job ne garde pas le GPU indéfiniment : il s'arrête en `error` au bout de 15 minutes, ou sur `POST /jobs/{id}/cancel` (`202` accepté, `404` inconnu, `409` déjà fini). L'arrêt est coopératif, il prend effet au prochain point de passage : quelques secondes, ou le temps du premier segment transcrit. Un direct en cours ou programmé est refusé avant tout téléchargement, un direct terminé est accepté.
 - Les runs terminés se relisent par `GET /runs`, `GET /runs/latest` (le dernier run réussi), `GET /runs/{id}`, sa vue `GET /runs/{id}/markdown` et ses slides `GET /runs/{id}/frames/{name}`.
 - Les erreurs sont `{"detail": "..."}`, en français.
@@ -174,7 +174,7 @@ git config core.hooksPath scripts/hooks
 
 ### Tests de bout en bout de la page
 
-Neuf contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`, bouton « Annuler »), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
+Treize contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`, bouton « Annuler », infos de la vidéo avant la fin du job, bouton `.txt` sans texte puis avec texte, champ hotwords), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
 
 ```sh
 scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1
