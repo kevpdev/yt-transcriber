@@ -8,14 +8,14 @@ import logging
 import sys
 import tempfile
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
 import av
 import numpy as np
 
-from .audio import AudioError, readable_error
+from .audio import AudioError, no_check, readable_error
 from .runs import Frame
 
 log = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ _VIDEO_FORMAT = (
 Sample = tuple[float, np.ndarray]
 
 
-def download_video(url: str, dest_dir: Path) -> Path:
+def download_video(url: str, dest_dir: Path, check: Callable[[], None] = no_check) -> Path:
     """Video stream only, 720p at most, AV1 then VP9. yt-dlp never merges, so no ffmpeg."""
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import DownloadError
@@ -48,6 +48,7 @@ def download_video(url: str, dest_dir: Path) -> Path:
         "noplaylist": True,
         "quiet": True,
         "noprogress": True,
+        "progress_hooks": [lambda _: check()],
     }
     try:
         with YoutubeDL(opts) as ydl:
@@ -58,13 +59,14 @@ def download_video(url: str, dest_dir: Path) -> Path:
         raise AudioError(readable_error(str(exc), "la vidéo")) from exc
 
 
-def sample_frames(video: Path) -> Iterator[Sample]:
+def sample_frames(video: Path, check: Callable[[], None] = no_check) -> Iterator[Sample]:
     """About one RGB image per SAMPLE_EVERY_S of video, with its time in seconds."""
     next_at = 0.0
     with av.open(str(video)) as container:
         stream = container.streams.video[0]
         stream.thread_type = "AUTO"
         for frame in container.decode(stream):
+            check()
             if frame.time is None or frame.time < next_at:
                 continue
             next_at = frame.time + SAMPLE_EVERY_S
@@ -131,12 +133,14 @@ def write_webp(rgb: np.ndarray, path: Path) -> None:
             out.mux(packet)
 
 
-def capture_frames(url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
+def capture_frames(
+    url: str, work_dir: Path, out_dir: Path, check: Callable[[], None] = no_check
+) -> list[Frame]:
     """Slides of a video as `out_dir/<position>.webp`. The downloaded video never stays."""
     video: Path | None = None
     try:
-        video = download_video(url, work_dir)
-        selected = select_frames(sample_frames(video))
+        video = download_video(url, work_dir, check)
+        selected = select_frames(sample_frames(video, check))
         out_dir.mkdir(parents=True, exist_ok=True)
         frames = []
         for position, (t, rgb) in enumerate(selected):

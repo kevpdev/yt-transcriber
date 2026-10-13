@@ -1,9 +1,13 @@
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+_LIVE = ("is_live", "is_upcoming")
 
 
 class AudioError(Exception):
@@ -24,7 +28,11 @@ class Download:
     duration: float | None = None
 
 
-def download_audio(url: str, dest_dir: Path) -> Download:
+def no_check() -> None:
+    pass
+
+
+def download_audio(url: str, dest_dir: Path, check: Callable[[], None] = no_check) -> Download:
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import DownloadError
 
@@ -34,10 +42,17 @@ def download_audio(url: str, dest_dir: Path) -> Download:
         "noplaylist": True,
         "quiet": True,
         "noprogress": True,
+        # An exception raised by the hook leaves yt-dlp as it is, it stops the download.
+        "progress_hooks": [lambda _: check()],
     }
     try:
         with YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            info = ydl.extract_info(url, download=False)
+            if info.get("live_status") in _LIVE:
+                raise AudioError(
+                    "Les directs en cours ne sont pas pris en charge : attends la fin du direct."
+                )
+            info = ydl.process_ie_result(info, download=True)
             return Download(
                 path=Path(ydl.prepare_filename(info)),
                 title=info.get("title"),

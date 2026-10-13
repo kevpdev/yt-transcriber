@@ -16,6 +16,7 @@ from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 # Every operation and the codes it must declare. A new route fails the test until it is added.
 EXPECTED = {
     ("post", "/jobs"): {"202", "409", "422"},
+    ("post", "/jobs/{job_id}/cancel"): {"202", "404", "409"},
     ("get", "/jobs/{job_id}"): {"200", "404"},
     ("get", "/runs"): {"200", "422"},
     ("get", "/runs/latest"): {"200", "404"},
@@ -108,6 +109,8 @@ def test_real_job_bodies_match_their_published_models():
     wait_for(client, job_id)
     check(client.get(f"/jobs/{job_id}"), 200, c.JobView)
     check(client.get("/jobs/inconnu"), 404, c.Detail)
+    check(client.post(f"/jobs/{job_id}/cancel"), 409, c.Detail)
+    check(client.post("/jobs/inconnu/cancel"), 404, c.Detail)
     check(client.post("/jobs", json={"url": "nope"}), 422, c.RequestError)
     check(client.post("/jobs", json={"url": URL, "level": "video"}), 422, c.RequestError)
     check(client.post("/jobs", json={"url": 5}), 422, c.RequestError)
@@ -120,7 +123,7 @@ def test_real_run_bodies_match_their_published_models(tmp_path):
     run_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
     assert wait_for(client, run_id)["stage"] == j.DONE
 
-    def failing(url, dest):
+    def failing(url, dest, check=None):
         raise AudioError("Vidéo indisponible.")
 
     failed = TestClient(create_app(FakeTranscriber(), failing, runs))

@@ -24,7 +24,8 @@ _STEPS = 10
 _SENTENCES = FAKE_TEXT.split(". ")
 
 
-def fake_download(url: str, dest_dir: Path) -> Download:
+def fake_download(url: str, dest_dir: Path, check: Callable[[], None] = lambda: None) -> Download:
+    check()
     path = dest_dir / "audio.webm"
     path.touch()
     return Download(
@@ -46,9 +47,12 @@ def fake_segments() -> list[Segment]:
     ]
 
 
-def fake_capture(url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
+def fake_capture(
+    url: str, work_dir: Path, out_dir: Path, check: Callable[[], None] = lambda: None
+) -> list[Frame]:
     """Two synthetic WebP images, one per half of the fake video."""
     time.sleep(FAKE_CAPTURE_DELAY)
+    check()
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = []
     for position, shade in enumerate((60, 200)):

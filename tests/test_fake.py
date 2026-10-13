@@ -106,3 +106,13 @@ def test_build_app_without_yt_fake_builds_the_real_transcriber(monkeypatch, valu
     monkeypatch.setattr(main, "Transcriber", RealStub)
     build_app()
     assert len(built) == 1
+
+
+def test_fake_pair_stops_when_check_raises(tmp_path):
+    def check():
+        raise j.JobStopped("Transcription annulée.")
+
+    with pytest.raises(j.JobStopped):
+        fake.fake_download(URL, tmp_path, check)
+    with pytest.raises(j.JobStopped):
+        fake.fake_capture(URL, tmp_path, tmp_path / "out", check)
