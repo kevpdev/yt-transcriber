@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from . import contract as c
 from . import jobs as j
 from .audio import AudioError, download_audio
 from .fake import FakeTranscriber, fake_capture, fake_download
@@ -40,9 +41,14 @@ def with_frame_urls(run: dict) -> dict:
 
 
 class JobRequest(BaseModel):
-    url: str = ""
+    url: str = Field("", description="A YouTube video URL.")
     # Any type: a null or a number gets the French 422 below, not the pydantic one.
-    level: Any = None
+    # The enum is published in the schema only, it is checked by `create_job`.
+    level: Any = Field(
+        None,
+        description="`frames` also captures the slides. Missing or null means `text`.",
+        json_schema_extra={"enum": [*LEVELS, None], "default": "text"},
+    )
 
 
 def create_app(
@@ -150,7 +156,15 @@ def create_app(
         else:
             store.fail(job, error or "Erreur inattendue pendant la transcription.")
 
-    @app.post("/jobs", status_code=202)
+    @app.post(
+        "/jobs",
+        status_code=202,
+        responses={
+            202: {"model": c.JobCreated, "description": "Job queued, poll it with its id."},
+            409: c.error("A job is already running."),
+            422: c.error("Invalid YouTube URL or unknown level.", c.RequestError),
+        },
+    )
     def create_job(req: JobRequest):
         try:
             video_id = parse_video_id(req.url)
@@ -170,7 +184,10 @@ def create_app(
         ).start()
         return {"id": job.id}
 
-    @app.get("/jobs/{job_id}")
+    @app.get(
+        "/jobs/{job_id}",
+        responses={200: {"model": c.JobView}, 404: c.error("Unknown job.")},
+    )
     def get_job(job_id: str):
         job = store.get(job_id)
         if job is None:
@@ -190,7 +207,12 @@ def create_app(
             )
         return value
 
-    @app.get("/runs")
+    @app.get(
+        "/runs",
+        responses={200: {"model": c.RunList}, 422: c.error("Invalid limit or offset.")},
+        # Read by `int_param` and only declared here: a Query(int) would answer in English.
+        openapi_extra={"parameters": c.PAGINATION},
+    )
     def list_runs(request: Request):
         limit = int_param(request, "limit", 20, 1, 100)
         offset = int_param(request, "offset", 0, 0, None)
@@ -201,7 +223,10 @@ def create_app(
             "offset": offset,
         }
 
-    @app.get("/runs/latest")
+    @app.get(
+        "/runs/latest",
+        responses={200: {"model": c.Run}, 404: c.error("No run is done.")},
+    )
     def get_latest_run():
         run_id = runs.latest_id()
         run = runs.get_run(run_id) if run_id else None
@@ -209,14 +234,24 @@ def create_app(
             return JSONResponse({"detail": "Aucun run réussi."}, status_code=404)
         return with_frame_urls(run)
 
-    @app.get("/runs/{run_id}")
+    @app.get(
+        "/runs/{run_id}",
+        responses={200: {"model": c.Run}, 404: c.error("Unknown run.")},
+    )
     def get_run(run_id: str):
         run = runs.get_run(run_id)
         if run is None:
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
         return with_frame_urls(run)
 
-    @app.get("/runs/{run_id}/frames/{name}")
+    @app.get(
+        "/runs/{run_id}/frames/{name}",
+        response_class=Response,
+        responses={
+            200: c.content("image/webp", c.BINARY, "The image of one captured slide."),
+            404: c.error("Unknown run, or a name that is not an image of the run."),
+        },
+    )
     def get_run_frame(run_id: str, name: str):
         if not runs.has_run(run_id):
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
@@ -225,14 +260,30 @@ def create_app(
             return JSONResponse({"detail": "Image inconnue."}, status_code=404)
         return FileResponse(file, media_type="image/webp")
 
-    @app.get("/runs/{run_id}/markdown")
+    @app.get(
+        "/runs/{run_id}/markdown",
+        response_class=Response,
+        responses={
+            200: c.content(
+                "text/markdown",
+                c.TEXT,
+                "UTF-8. `# <title, or the video_id without one>`, a blank line, then one "
+                "`[mm:ss] text` line per segment, `[h:mm:ss]` from one hour.",
+            ),
+            404: c.error("Unknown run."),
+        },
+    )
     def get_run_markdown(run_id: str):
         run = runs.get_run(run_id)
         if run is None:
             return JSONResponse({"detail": "Run inconnu."}, status_code=404)
         return Response(to_markdown(run), media_type="text/markdown; charset=utf-8")
 
-    @app.get("/")
+    @app.get(
+        "/",
+        response_class=HTMLResponse,
+        responses={200: c.content("text/html", c.TEXT, "The page.")},
+    )
     def index():
         return FileResponse(STATIC / "index.html")
 

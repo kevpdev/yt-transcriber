@@ -1,27 +1,26 @@
 # API
 
-The HTTP API surface: its style, the main resources, and the contracts.
+The HTTP API surface: its style, where the contract lives, and what the schema cannot say.
 
 ## Style
 
 - JSON over HTTP with FastAPI. The routes are defined inside `create_app` in `app/main.py`.
 - No versioning, routes sit at the root.
 
-## Resources
+## Contract
 
-- `POST /jobs` takes `{"url": "...", "level": "text"}` and returns `202 {"id"}`. `level` is optional: `text` (default, also for `null`) or `frames`, which also captures the slides. `422` for an invalid URL or an unknown level (`{"detail": "Le niveau doit être text ou frames."}`), `409` when a job is already running.
-- `GET /jobs/{id}` returns `{id, stage, progress, text, segments, error}`. `segments` is the list of `{start, end, text}` in seconds, empty until the job is `done`. `404` for an unknown id.
-- `GET /runs?limit=&offset=` lists the finished runs, newest first (`started_at`, then insertion order). `limit` is 1 to 100 (default 20), `offset` at least 0, otherwise `422`. Returns `{runs, total, limit, offset}`, each run a summary: `id, video_id, url, title, channel, video_duration, state, level, language, word_count, started_at, total_s`.
-- `GET /runs/latest` returns the most recent run with state `done` in full, `404 {"detail": "Aucun run réussi."}` when there is none.
-- `GET /runs/{id}` returns every column of the run (`level` included), with `settings`, `machine` and `versions` as objects, `segments` as `{start, end, text}` and `frames` as `{position, time, path, url}` (empty without capture, `path` relative to the database folder, `url` the relative route that serves the image, also on `/runs/latest`). `404 {"detail": "Run inconnu."}` for an unknown id.
-- `GET /runs/{id}/markdown` returns `text/markdown; charset=utf-8`: `# <title or video_id>`, then one `[mm:ss] text` line per segment (`[h:mm:ss]` from one hour). Same `404`.
-- `GET /runs/{id}/frames/{name}` returns the image as `image/webp`. The name must be the file name of a `frames` row of the run, so the table is the allow-list. An encoded `/` (`..%2Fruns.db`) never reaches the route and gets the generic Starlette `404 {"detail": "Not Found"}`, in English. `404 {"detail": "Image inconnue."}` for an unlisted name or a file gone from the disk (and always with `:memory:`), `404 {"detail": "Run inconnu."}` for an unknown run.
-- `GET /` serves the page.
-- `GET /static/{file}` serves the CSS and JS of the page. `404 {"detail"}` for an unknown file.
+- `/openapi.json` is the contract: every route, its parameters, the schema of its success and of each error code, and the media type of the bodies that are not JSON. `/docs` renders it. Read them for the fields, not this file.
+- The response models live in `app/contract.py`. Routes declare them with `responses=`, never `response_model=`, so they describe the bodies without filtering or re-serializing them. `tests/test_contract.py` fails when a route publishes an empty schema or omits a code, and validates the real bodies against the models (`extra="forbid"`).
+- A new route or a changed body updates `app/contract.py` and the `EXPECTED` table of `tests/test_contract.py` in the same change.
+- FastAPI adds a `422` with its own validation schema to every route with a path parameter. It never fires, a string path parameter always validates.
 
-## Contracts
+## What the schema does not say
 
-- Errors are `{"detail": "<message>"}`, written in French for the end user, never a stack trace.
-- `stage` is one of `queued`, `downloading`, `transcribing`, `extracting`, `done`, `error`. `extracting` only exists at level `frames` and has no percentage. `progress` goes from 0 to 1.
+- Errors are `{"detail": "<message>"}`, written in French for the end user, never a stack trace. The exception is a `POST /jobs` body that is not the expected JSON, which gets the English list of the validation library.
+- A second `POST /jobs` gets `409` until the first is `done` or `error`. Why one job at a time, the polling and what a restart loses are in `architecture.md`. Runs are the finished jobs, read back from SQLite.
+- `POST /jobs` publishes the `text` and `frames` values of `level` in the schema, but types it loosely: a null means `text`, and any other value gets the French `422`, not the one of the validation library.
 - Only YouTube URLs are accepted, and the backend rewrites them to the canonical `watch?v=` form before downloading (`app/urls.py`).
-- No OpenAPI spec is maintained. The README API section, `app/main.py` and `app/jobs.py` are the reference.
+- `GET /runs` reads `limit` and `offset` itself, so its `422` stays in French. They are declared in the schema by `openapi_extra`.
+- `GET /runs/latest` is the most recent run with state `done`, failed runs are skipped. `GET /runs` sorts by `started_at`, then insertion order.
+- `GET /runs/{id}/frames/{name}` only serves a name listed in the `frames` rows of the run, so the table is the allow-list. An encoded `/` (`..%2Fruns.db`) never reaches the route and gets the generic Starlette `404 {"detail": "Not Found"}`, in English. With `:memory:` there is no image folder and every name is `404`.
+- `GET /static/{file}` serves the CSS and JS of the page, outside the schema (a mounted folder).
