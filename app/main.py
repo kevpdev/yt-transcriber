@@ -76,6 +76,7 @@ def create_app(
         # Losing a transcript for a failed image or a late capture costs more than having no
         # images. Only an explicit cancel ends the job in error.
         try:
+            job.check()
             return capture(url, work_dir, out_dir, job.check)
         except j.JobStopped as exc:
             shutil.rmtree(out_dir, ignore_errors=True)
@@ -113,7 +114,6 @@ def create_app(
                 result = transcriber.run(meta.path, lambda p: progress(job, p))
                 t_transcribe = time.monotonic() - t0 - t_download
                 if job.frames:
-                    job.check()
                     store.set_stage(job, j.EXTRACTING)
                     if runs.frames_dir:
                         images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
