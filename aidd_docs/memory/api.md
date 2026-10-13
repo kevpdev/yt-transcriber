@@ -17,8 +17,8 @@ The HTTP API surface: its style, where the contract lives, and what the schema c
 ## What the schema does not say
 
 - Errors are `{"detail": "<message>"}`, written in French for the end user, never a stack trace. The exception is a `POST /jobs` body that is not the expected JSON, which gets the English list of the validation library.
-- One job at a time, because there is one GPU: a second `POST /jobs` gets `409` until the first is `done` or `error`. The page polls `GET /jobs/{id}` every 2 s.
-- Jobs live in memory, the last 20 are kept and a restart loses them. Runs are the finished jobs, read back from SQLite.
+- A second `POST /jobs` gets `409` until the first is `done` or `error`. Why one job at a time, the polling and what a restart loses are in `architecture.md`. Runs are the finished jobs, read back from SQLite.
+- `POST /jobs` publishes the `text` and `frames` values of `level` in the schema, but types it loosely: a null means `text`, and any other value gets the French `422`, not the one of the validation library.
 - Only YouTube URLs are accepted, and the backend rewrites them to the canonical `watch?v=` form before downloading (`app/urls.py`).
 - `GET /runs` reads `limit` and `offset` itself, so its `422` stays in French. They are declared in the schema by `openapi_extra`.
 - `GET /runs/latest` is the most recent run with state `done`, failed runs are skipped. `GET /runs` sorts by `started_at`, then insertion order.

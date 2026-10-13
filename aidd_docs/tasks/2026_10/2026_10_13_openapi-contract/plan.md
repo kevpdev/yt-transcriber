@@ -18,8 +18,8 @@ FastAPI publie déjà `/openapi.json` et `/docs`. Aucune route n'a de `response_
 
 ## Phase 1: modèles, déclaration, tests et mémoire
 
-- [x] `app/contract.py` : un modèle pydantic par forme de réponse JSON (`Detail`, `JobCreated`, `JobView`, `RunList`, `RunSummary`, `Run`, `Segment`, `FrameOut`), `extra="forbid"`, avec la description des champs que le nom ne dit pas.
-- [x] `app/main.py` : chaque route déclare ses codes dans `responses=`, le media type de `/`, `/runs/{id}/markdown` et `/runs/{id}/frames/{name}`, et les paramètres `limit` et `offset` de `GET /runs` via `openapi_extra`.
+- [x] `app/contract.py` : un modèle pydantic par forme de réponse JSON (`Detail`, `JobCreated`, `JobView`, `RunList`, `RunSummary`, `Run`, `TimedSegment`, `FrameOut`, et `RequestError` pour le `422` de `POST /jobs`), `extra="forbid"`, avec la description des champs que le nom ne dit pas.
+- [x] `app/main.py` : `JobRequest` publie les valeurs de `level` sans changer sa validation, chaque route déclare ses codes dans `responses=`, le media type de `/`, `/runs/{id}/markdown` et `/runs/{id}/frames/{name}`, et les paramètres `limit` et `offset` de `GET /runs` via `openapi_extra`.
 - [x] `tests/test_contract.py` : chaque réponse de chaque route a un schéma non vide, chaque route déclare les codes attendus, et les corps réels valident contre leur modèle.
 - [x] `aidd_docs/memory/api.md`, `codebase-map.md`, `testing.md` et la section API du README renvoient vers `/docs` et `/openapi.json`.
 
