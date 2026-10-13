@@ -149,15 +149,18 @@ done
 CODE=$(curl -s -o run.json -w '%{http_code}' "$BASE/runs/$ID")
 [ "$CODE" = 200 ] || { echo "GET /runs/$ID $CODE"; exit 1; }
 jq '{state, error, title, language, word_count, frames: (.frames | length)}' run.json
-curl -s "$BASE/runs/latest" | jq -r .id   # le même id si le job a réussi
+jq -e '.state == "done"' run.json >/dev/null || { jq -r .error run.json; exit 1; }
+curl -s "$BASE/runs/latest" | jq -r .id   # le même id si tu es le seul client
 
 # 5. télécharger la première image
 FRAME=$(jq -r '.frames[0].url // empty' run.json)
 [ -n "$FRAME" ] || { echo "aucune image"; exit 1; }
-curl -s -o slide.webp -w '%{http_code} %{content_type}\n' "$BASE$FRAME"
+CODE=$(curl -s -o slide.webp -w '%{http_code}' "$BASE$FRAME")
+[ "$CODE" = 200 ] || { echo "GET $FRAME $CODE"; exit 1; }
+echo "$FRAME enregistrée dans slide.webp"
 ```
 
-Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 54 s de bout en bout, run `done` en français, 3 680 mots, 49 images, et `200 image/webp` pour la première. Un second lancement pendant le premier s'est arrêté sur `POST /jobs 409`.
+Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 52 s de bout en bout et code de sortie 0, run `done` en français, 3 680 mots, 49 images, la première enregistrée en WebP 1280x720. Un second lancement pendant le premier s'est arrêté sur `POST /jobs 409`.
 
 ## Tests
 
