@@ -20,6 +20,8 @@ Prérequis : Docker avec Compose, `nvidia-container-toolkit`, un GPU NVIDIA réc
 
 La langue parlée est détectée automatiquement et le texte sort dans cette langue, sans traduction. Un seul job tourne à la fois, un second reçoit un message clair.
 
+Quand un job échoue, la page affiche un message court. La cause complète est dans les journaux du conteneur, `docker compose logs yt-transcriber` : une ligne au début et à la fin de chaque job avec son identifiant, et le traceback de chaque échec.
+
 ## Réglages
 
 | Variable   | Défaut                                | Rôle                                           |
