@@ -21,6 +21,7 @@ const $ = (id) => document.getElementById(id);
 const STAGES = { queued: "En attente", downloading: "Téléchargement de l'audio", transcribing: "Transcription", extracting: "Extraction des images" };
 let timer = null;
 let finished = null;
+let current = null;
 
 function formatTime(seconds) {
   const total = Math.floor(seconds);
@@ -40,7 +41,12 @@ function render() {
   $("out").value = timed ? timedText(finished.segments) : finished.text;
 }
 
-function setBusy(busy) { $("go").disabled = busy; $("go-frames").disabled = busy; }
+function setBusy(busy) {
+  $("go").disabled = busy;
+  $("go-frames").disabled = busy;
+  $("cancel").hidden = !busy;
+  $("cancel").disabled = false;
+}
 function showError(msg) { $("error").textContent = msg || ""; }
 
 async function readError(resp) {
@@ -54,6 +60,7 @@ function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.
 function remembered() { try { return localStorage.getItem(KEY); } catch { return null; } }
 
 function stop(message) {
+  current = null;
   remember(null);
   if (message) showError(message);
   setBusy(false);
@@ -117,6 +124,7 @@ $("form").addEventListener("submit", async (ev) => {
     }
     $("status").textContent = "En attente";
     const { id } = await resp.json();
+    current = id;
     remember(id);
     poll(id);
   } catch (e) {
@@ -127,10 +135,23 @@ $("form").addEventListener("submit", async (ev) => {
 
 const resumed = remembered();
 if (resumed) {
+  current = resumed;
   setBusy(true);
   $("status").textContent = "Reprise du job en cours…";
   poll(resumed);
 }
+
+$("cancel").addEventListener("click", async () => {
+  if (!current) return;
+  $("cancel").disabled = true;
+  try {
+    const resp = await fetch(`/jobs/${current}/cancel`, { method: "POST" });
+    // A 404 or 409 means the job is gone or finished: the polling shows the final state.
+    if (resp.ok) $("status").textContent = "Annulation…";
+  } catch {
+    $("cancel").disabled = false;
+  }
+});
 
 $("timestamps").addEventListener("click", () => {
   const pressed = $("timestamps").getAttribute("aria-pressed") === "true";

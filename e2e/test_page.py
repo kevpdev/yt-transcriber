@@ -161,3 +161,23 @@ def test_slides_button_shows_the_extraction_step(page, base_url, video_url, e2e_
     if e2e_level == "fake":
         run = page.request.get(f"{base_url}/runs/latest").json()
         assert run["level"] == "frames" and len(run["frames"]) == 2
+
+
+def test_cancel_button_stops_the_job_and_frees_the_page(page, base_url, video_url):
+    page.goto(base_url)
+    expect(page.locator("#cancel")).to_be_hidden()
+    page.fill("#url", video_url)
+    page.click("#go")
+    expect(page.locator("#cancel")).to_be_visible()
+    expect(page.locator("#status")).to_have_text(RUNNING, timeout=30_000)
+    page.click("#cancel")
+    expect(page.locator("#error")).to_have_text("Transcription annulée.", timeout=30_000)
+    expect(page.locator("#cancel")).to_be_hidden()
+    expect(page.locator("#go")).to_be_enabled()
+
+    # The lock is free: a new job starts, then the test cancels it so the next test finds none.
+    page.click("#go")
+    expect(page.locator("#error")).to_have_text("")
+    expect(page.locator("#status")).to_have_text(RUNNING, timeout=30_000)
+    page.click("#cancel")
+    expect(page.locator("#error")).to_have_text("Transcription annulée.", timeout=30_000)
