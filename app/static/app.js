@@ -22,6 +22,7 @@ const STAGES = { queued: "En attente", downloading: "Téléchargement de l'audio
 let timer = null;
 let finished = null;
 let current = null;
+let cancelling = false;
 
 function formatTime(seconds) {
   const total = Math.floor(seconds);
@@ -61,6 +62,7 @@ function remembered() { try { return localStorage.getItem(KEY); } catch { return
 
 function stop(message) {
   current = null;
+  cancelling = false;
   remember(null);
   if (message) showError(message);
   setBusy(false);
@@ -98,7 +100,7 @@ async function poll(id, failures = 0) {
     return stop(job.error);
   }
   const pct = job.stage === "transcribing" ? ` · ${Math.round(job.progress * 100)} %` : "";
-  $("status").textContent = (STAGES[job.stage] || job.stage) + pct;
+  $("status").textContent = cancelling ? "Annulation…" : (STAGES[job.stage] || job.stage) + pct;
   timer = setTimeout(() => poll(id), 2000);
 }
 
@@ -109,6 +111,7 @@ $("form").addEventListener("submit", async (ev) => {
   clearTimeout(timer);
   showError("");
   finished = null;
+  cancelling = false;
   $("out").value = "";
   setBusy(true);
   try {
@@ -147,7 +150,10 @@ $("cancel").addEventListener("click", async () => {
   try {
     const resp = await fetch(`/jobs/${current}/cancel`, { method: "POST" });
     // A 404 or 409 means the job is gone or finished: the polling shows the final state.
-    if (resp.ok) $("status").textContent = "Annulation…";
+    if (resp.ok) {
+      cancelling = true;
+      $("status").textContent = "Annulation…";
+    }
   } catch {
     $("cancel").disabled = false;
   }
