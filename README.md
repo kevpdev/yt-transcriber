@@ -87,6 +87,57 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 - `GET /runs/{id}/frames/{name}` renvoie l'image WebP d'un slide (`url` relative donnée par `GET /runs/{id}`). `404 {"detail": "Image inconnue."}` si le nom n'est pas une image du run ou si le fichier a disparu, `404 {"detail": "Run inconnu."}` si l'id est inconnu.
 - `GET /runs/{id}/markdown` renvoie le transcript en `text/markdown` : un titre, puis une ligne `[mm:ss] texte` par segment (`[h:mm:ss]` dès une heure).
 
+## Piloter l'app depuis un agent
+
+Cette section suffit à un agent, ou au skill qui le pilote, pour transcrire une vidéo sans lire le code. Elle demande `curl` et `jq` sur l'hôte, et l'app écoute sur `http://localhost:8000`.
+
+### Le cycle
+
+1. **Lancer l'app** avec `docker compose up --build -d`. Le modèle se charge avant que le serveur accepte une connexion : tant que `curl` sur `/` est refusé, l'app n'est pas prête. Au premier démarrage, le modèle (1,6 Go) est d'abord téléchargé.
+2. **Lancer un job** avec `POST /jobs` et `{"url": "<URL YouTube>", "level": "frames"}`. `level` vaut `text` (défaut, transcription seule) ou `frames` (transcription puis capture des slides). La réponse `202 {"id": "..."}` donne l'id du job.
+3. **Sonder le job** avec `GET /jobs/{id}` toutes les 2 secondes, jusqu'à ce que `stage` vaille `done` ou `error`. Les étapes passent par `queued`, `downloading`, `transcribing` (avec `progress` de 0 à 1), puis `extracting` au niveau `frames`. En `error`, le champ `error` porte le message.
+4. **Relire le run** avec `GET /runs/{id}`, le même id que le job. La ligne est écrite avant que le job passe à `done` ou `error`, donc elle existe dès que l'étape 3 s'arrête, y compris pour un échec (`state` vaut alors `error`). `GET /runs/latest` renvoie le dernier run réussi, qui est le tien si tu es le seul client. `GET /runs/{id}/markdown` donne le transcript horodaté.
+5. **Télécharger les images** : chaque élément de `frames` porte `position`, `time` (secondes dans la vidéo) et `url`, une route relative à préfixer par `http://localhost:8000`. La réponse est un fichier `image/webp`.
+6. **Arrêter l'app** avec `docker compose down`, jamais `down -v` qui efface le modèle en cache. L'historique dans `data/` survit dans les deux cas.
+
+### Les codes à traiter
+
+| Appel | Code | Corps | Quoi faire |
+| --- | --- | --- | --- |
+| `POST /jobs` | `202` | `{"id"}` | sonder le job |
+| `POST /jobs` | `409` | `{"detail": "Une transcription est déjà en cours, attends qu'elle se termine."}` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
+| `POST /jobs` | `422` | `{"detail": "..."}` | URL qui n'est pas YouTube, ou `level` autre que `text` ou `frames`. Corriger la requête, réessayer ne sert à rien |
+| `GET /jobs/{id}` | `404` | `{"detail": "Job inconnu."}` | les jobs vivent en mémoire, un redémarrage les perd. Le run fini reste lisible par `GET /runs/{id}` |
+| `GET /runs/{id}` | `404` | `{"detail": "Run inconnu."}` | id inconnu, ou job pas encore fini |
+| `GET /runs/latest` | `404` | `{"detail": "Aucun run réussi."}` | aucun run en état `done` |
+| `GET /runs/{id}/frames/{name}` | `404` | `{"detail": "Image inconnue."}` | nom absent de `frames` du run, ou fichier effacé du disque |
+
+Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
+
+### Exemple complet
+
+```sh
+BASE=http://localhost:8000
+until curl -s -o /dev/null "$BASE/"; do sleep 5; done        # 1. attendre le modèle
+
+ID=$(curl -s -X POST "$BASE/jobs" -H 'Content-Type: application/json' \
+  -d '{"url": "https://www.youtube.com/watch?v=KnXm3PbNz5A", "level": "frames"}' | jq -r .id)
+echo "job $ID"                                                 # 2. "null" si 409 ou 422
+
+until curl -s "$BASE/jobs/$ID" | jq -e '.stage == "done" or .stage == "error"' >/dev/null; do
+  sleep 2                                                      # 3. sonder
+done
+
+curl -s "$BASE/runs/$ID" \
+  | jq '{state, error, title, language, word_count, frames: (.frames | length)}'   # 4. relire
+curl -s "$BASE/runs/latest" | jq -r .id                        #    même id si le job a réussi
+
+FRAME=$(curl -s "$BASE/runs/$ID" | jq -r '.frames[0].url')
+curl -s -o slide.webp -w '%{http_code} %{content_type}\n' "$BASE$FRAME"   # 5. une image
+```
+
+Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 52 s de bout en bout, run `done` en français, 3 680 mots, 49 images, et `200 image/webp` pour la première.
+
 ## Tests
 
 ```sh
