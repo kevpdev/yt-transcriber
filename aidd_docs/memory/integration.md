@@ -12,6 +12,6 @@ project, this one included, lives in the ecosystem memory.
 ## Calling conventions
 
 - No auth, no API key, no retries and no timeouts are configured.
-- A YouTube failure becomes an `AudioError` with a readable message, the job ends in `error` and the app keeps running.
+- A YouTube failure becomes an `AudioError` with a readable message, the job ends in `error` and the app keeps running. The yt-dlp error it wraps is in the traceback of `docker compose logs`.
 - yt-dlp is locked in `uv.lock` and upgraded at build. When YouTube changes and the download breaks, rebuild with `docker compose build --no-cache`.
 - If the Hub is unreachable on an empty volume, the model cannot load and the app does not start (supposed, from the lifespan code, not tested).

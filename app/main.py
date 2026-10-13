@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -81,6 +82,7 @@ def create_app(
         result = None
         images: list[Frame] = []
         error = None
+        log.info("Job %s started: %s, level %s", job.id, url, "frames" if job.frames else "text")
         try:
             store.set_stage(job, j.DOWNLOADING)
             with tempfile.TemporaryDirectory() as tmp:
@@ -94,8 +96,11 @@ def create_app(
                     if runs.frames_dir:
                         images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
         except AudioError as exc:
+            # The cause is the last line of the traceback, the header does not repeat it.
+            log.exception("Job %s failed to download", job.id)
             error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
+            log.exception("Job %s failed with an unexpected error", job.id)
             error = f"Erreur inattendue pendant la transcription : {exc}"
         done = error is None and result is not None
         # The row is written before the job is published as finished, so a reader that sees
@@ -133,6 +138,13 @@ def create_app(
             log.exception("Could not record run %s", job.id)
             if runs.frames_dir:
                 shutil.rmtree(runs.frames_dir / job.id, ignore_errors=True)
+        # Logged before the job is published, so a reader that sees it finished finds the line.
+        log.info(
+            "Job %s finished: %s in %.1f s",
+            job.id,
+            j.DONE if done else j.ERROR,
+            time.monotonic() - t0,
+        )
         if done and result:
             store.finish(job, result.text, result.segments)
         else:
@@ -229,8 +241,23 @@ def create_app(
     return app
 
 
+def setup_logging() -> None:
+    """Send the INFO logs of the `app` package to stdout, read by `docker compose logs`.
+
+    Uvicorn configures only its own loggers: without this, an INFO line is lost and an
+    ERROR line goes out bare, through the `lastResort` handler of `logging`.
+    """
+    logger = logging.getLogger("app")
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        logger.addHandler(handler)
+
+
 def build_app() -> FastAPI:
     # started by `uvicorn --factory app.main:build_app`, tests import it without a GPU
+    setup_logging()
     runs = RunStore(os.environ.get("YT_DB", "/data/runs.db"))
     if os.environ.get("YT_FAKE") == "1":
         return create_app(FakeTranscriber(), fake_download, runs, fake_capture)
