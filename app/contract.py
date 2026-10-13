@@ -33,6 +33,10 @@ class JobCreated(Shape):
     id: str
 
 
+class JobCancel(Shape):
+    id: str = Field(description="The job whose stop was requested, poll it for the final state.")
+
+
 class TimedSegment(Shape):
     start: float = Field(description="Seconds from the start of the video.")
     end: float = Field(description="Seconds from the start of the video.")

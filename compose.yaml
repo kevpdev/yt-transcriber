@@ -16,6 +16,18 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    # Healthy only once uvicorn answers, and it opens the port after the model is loaded.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8000/", timeout=4)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+      start_interval: 5s
     logging:
       driver: local
       options:

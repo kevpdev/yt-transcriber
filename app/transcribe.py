@@ -62,12 +62,15 @@ class Transcriber:
             hotwords=hotwords(),
         )
         kept = []
+        progress = 0.0
         for segment in segments:
             text = segment.text.strip()
             if text:
                 kept.append(Segment(start=segment.start, end=segment.end, text=text))
+            # Called for every segment, the caller uses it as a checkpoint to stop the job.
             if info.duration:
-                on_progress(min(segment.end / info.duration, 1.0))
+                progress = min(segment.end / info.duration, 1.0)
+            on_progress(progress)
         return Transcript(
             text=" ".join(s.text for s in kept),
             segments=kept,

@@ -156,14 +156,14 @@ def test_capture_writes_frames_and_removes_the_video(monkeypatch, tmp_path: Path
     work, out = tmp_path / "work", tmp_path / "out"
     work.mkdir()
 
-    def fake_download(url, dest):
+    def fake_download(url, dest, check=None):
         path = dest / "v.webm"
         path.touch()
         return path
 
     samples = list(run((pattern(1), 5), (pattern(2), 5)))
     monkeypatch.setattr(frames, "download_video", fake_download)
-    monkeypatch.setattr(frames, "sample_frames", lambda video: iter(samples))
+    monkeypatch.setattr(frames, "sample_frames", lambda video, check=None: iter(samples))
     result = capture_frames("u", work, out)
     assert [(f.position, f.time) for f in result] == [(0, 0.0), (1, 5.0)]
     assert sorted(p.name for p in out.iterdir()) == ["0000.webp", "0001.webp"]
@@ -174,12 +174,12 @@ def test_capture_removes_the_video_when_selection_raises(monkeypatch, tmp_path: 
     work = tmp_path / "work"
     work.mkdir()
 
-    def fake_download(url, dest):
+    def fake_download(url, dest, check=None):
         path = dest / "v.webm"
         path.touch()
         return path
 
-    def boom(video):
+    def boom(video, check=None):
         raise RuntimeError("decode failed")
 
     monkeypatch.setattr(frames, "download_video", fake_download)
@@ -204,3 +204,55 @@ def test_sample_frames_decodes_a_video_about_once_per_second(tmp_path: Path):
             out.mux(packet)
     times = [t for t, _ in frames.sample_frames(video)]
     assert times == [0.0, 1.0, 2.0]
+
+
+def test_sample_frames_calls_check_for_every_decoded_frame(tmp_path: Path):
+    video = tmp_path / "v.mkv"
+    with av.open(str(video), "w") as out:
+        stream = out.add_stream("mpeg4", rate=4)
+        stream.width, stream.height = W, H
+        stream.pix_fmt = "yuv420p"
+        for i in range(8):
+            frame = av.VideoFrame.from_ndarray(solid(40), format="rgb24")
+            frame.pts = i
+            for packet in stream.encode(frame):
+                out.mux(packet)
+        for packet in stream.encode(None):
+            out.mux(packet)
+    calls = []
+
+    def check():
+        calls.append(1)
+        if len(calls) == 3:
+            raise RuntimeError("stop")
+
+    with pytest.raises(RuntimeError, match="stop"):
+        list(frames.sample_frames(video, check))
+    assert len(calls) == 3
+
+
+def test_download_video_passes_check_to_the_progress_hook(monkeypatch, tmp_path: Path):
+    class Hooked:
+        def __init__(self, opts):
+            self.opts = opts
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def extract_info(self, url, download):
+            self.opts["progress_hooks"][0]({"status": "downloading"})
+            return {}
+
+    monkeypatch.setattr("yt_dlp.YoutubeDL", Hooked)
+    calls = []
+
+    def check():
+        calls.append(1)
+        raise RuntimeError("stop")
+
+    with pytest.raises(RuntimeError, match="stop"):
+        download_video("u", tmp_path, check)
+    assert calls == [1]

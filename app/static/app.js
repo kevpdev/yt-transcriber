@@ -21,6 +21,8 @@ const $ = (id) => document.getElementById(id);
 const STAGES = { queued: "En attente", downloading: "Téléchargement de l'audio", transcribing: "Transcription", extracting: "Extraction des images" };
 let timer = null;
 let finished = null;
+let current = null;
+let cancelling = false;
 
 function formatTime(seconds) {
   const total = Math.floor(seconds);
@@ -40,7 +42,12 @@ function render() {
   $("out").value = timed ? timedText(finished.segments) : finished.text;
 }
 
-function setBusy(busy) { $("go").disabled = busy; $("go-frames").disabled = busy; }
+function setBusy(busy) {
+  $("go").disabled = busy;
+  $("go-frames").disabled = busy;
+  $("cancel").hidden = !busy;
+  $("cancel").disabled = false;
+}
 function showError(msg) { $("error").textContent = msg || ""; }
 
 async function readError(resp) {
@@ -54,6 +61,8 @@ function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.
 function remembered() { try { return localStorage.getItem(KEY); } catch { return null; } }
 
 function stop(message) {
+  current = null;
+  cancelling = false;
   remember(null);
   if (message) showError(message);
   setBusy(false);
@@ -91,7 +100,7 @@ async function poll(id, failures = 0) {
     return stop(job.error);
   }
   const pct = job.stage === "transcribing" ? ` · ${Math.round(job.progress * 100)} %` : "";
-  $("status").textContent = (STAGES[job.stage] || job.stage) + pct;
+  $("status").textContent = cancelling ? "Annulation…" : (STAGES[job.stage] || job.stage) + pct;
   timer = setTimeout(() => poll(id), 2000);
 }
 
@@ -102,6 +111,7 @@ $("form").addEventListener("submit", async (ev) => {
   clearTimeout(timer);
   showError("");
   finished = null;
+  cancelling = false;
   $("out").value = "";
   setBusy(true);
   try {
@@ -117,6 +127,7 @@ $("form").addEventListener("submit", async (ev) => {
     }
     $("status").textContent = "En attente";
     const { id } = await resp.json();
+    current = id;
     remember(id);
     poll(id);
   } catch (e) {
@@ -127,10 +138,27 @@ $("form").addEventListener("submit", async (ev) => {
 
 const resumed = remembered();
 if (resumed) {
+  current = resumed;
   setBusy(true);
   $("status").textContent = "Reprise du job en cours…";
   poll(resumed);
 }
+
+$("cancel").addEventListener("click", async () => {
+  if (!current) return;
+  $("cancel").disabled = true;
+  try {
+    const resp = await fetch(`/jobs/${current}/cancel`, { method: "POST" });
+    // A 404 or 409 means the job is gone or finished: the polling shows the final state.
+    // The job may have ended while the request was in flight: keep its final status.
+    if (resp.ok && current) {
+      cancelling = true;
+      $("status").textContent = "Annulation…";
+    }
+  } catch {
+    $("cancel").disabled = false;
+  }
+});
 
 $("timestamps").addEventListener("click", () => {
   const pressed = $("timestamps").getAttribute("aria-pressed") === "true";

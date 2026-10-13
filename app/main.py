@@ -56,6 +56,7 @@ def create_app(
     download=download_audio,
     runs: RunStore | None = None,
     capture=capture_frames,
+    timeout: float = j.JOB_TIMEOUT_S,
 ) -> FastAPI:
     transcriber = transcriber or Transcriber()
     store = j.JobStore()
@@ -72,13 +73,27 @@ def create_app(
     app = FastAPI(lifespan=lifespan)
 
     def capture_images(job: j.Job, url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
-        # Losing a transcript for a failed image costs more than having no images.
+        # Losing a transcript for a failed image or a late capture costs more than having no
+        # images. Only an explicit cancel ends the job in error.
         try:
-            return capture(url, work_dir, out_dir)
+            job.check()
+            return capture(url, work_dir, out_dir, job.check)
+        except j.JobStopped as exc:
+            shutil.rmtree(out_dir, ignore_errors=True)
+            if exc.cancelled:
+                raise
+            # The time limit hit during the capture: keep the transcript, drop the images.
+            log.warning("Capture of run %s stopped by the time limit: %s", job.id, exc)
+            return []
         except Exception:  # noqa: BLE001 - the job stays done, without images
             log.exception("Could not capture frames for run %s", job.id)
             shutil.rmtree(out_dir, ignore_errors=True)
             return []
+
+    def progress(job: j.Job, value: float) -> None:
+        # Every progress report is a checkpoint, the transcriber calls it for each segment.
+        job.check()
+        store.set_progress(job, value)
 
     def work(job: j.Job, video_id: str, url: str) -> None:
         started_at = datetime.now(UTC).isoformat()
@@ -92,15 +107,19 @@ def create_app(
         try:
             store.set_stage(job, j.DOWNLOADING)
             with tempfile.TemporaryDirectory() as tmp:
-                meta = download(url, Path(tmp))
+                meta = download(url, Path(tmp), job.check)
                 t_download = time.monotonic() - t0
+                job.check()
                 store.set_stage(job, j.TRANSCRIBING)
-                result = transcriber.run(meta.path, lambda p: store.set_progress(job, p))
+                result = transcriber.run(meta.path, lambda p: progress(job, p))
                 t_transcribe = time.monotonic() - t0 - t_download
                 if job.frames:
                     store.set_stage(job, j.EXTRACTING)
                     if runs.frames_dir:
                         images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
+        except j.JobStopped as exc:
+            log.info("Job %s stopped: %s", job.id, exc)
+            error = str(exc)
         except AudioError as exc:
             # The cause is the last line of the traceback, the header does not repeat it.
             log.exception("Job %s failed to download", job.id)
@@ -176,13 +195,30 @@ def create_app(
                 {"detail": f"Le niveau doit être {' ou '.join(LEVELS)}."}, status_code=422
             )
         try:
-            job = store.start(frames=level == "frames")
+            job = store.start(frames=level == "frames", timeout=timeout)
         except j.JobBusy as exc:
             return JSONResponse({"detail": str(exc)}, status_code=409)
         threading.Thread(
             target=work, args=(job, video_id, canonical_url(video_id)), daemon=True
         ).start()
         return {"id": job.id}
+
+    @app.post(
+        "/jobs/{job_id}/cancel",
+        status_code=202,
+        responses={
+            202: {"model": c.JobCancel, "description": "Stop requested, poll the job."},
+            404: c.error("Unknown job."),
+            409: c.error("The job is already finished."),
+        },
+    )
+    def cancel_job(job_id: str):
+        requested = store.cancel(job_id)
+        if requested is None:
+            return JSONResponse({"detail": "Job inconnu."}, status_code=404)
+        if not requested:
+            return JSONResponse({"detail": "Ce job est déjà terminé."}, status_code=409)
+        return {"id": job_id}
 
     @app.get(
         "/jobs/{job_id}",

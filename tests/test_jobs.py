@@ -34,7 +34,7 @@ class FakeTranscriber:
         )
 
 
-def fake_download(url, dest):
+def fake_download(url, dest, check=None):
     return Download(path=dest / "a.webm", title="T", channel="C", duration=12.0)
 
 
@@ -114,7 +114,7 @@ def test_second_job_while_running_gives_409_then_frees():
 
 
 def test_download_error_becomes_readable_job_error():
-    def failing(url, dest):
+    def failing(url, dest, check=None):
         raise AudioError("Impossible de télécharger l'audio : Video unavailable")
 
     client = TestClient(create_app(FakeTranscriber(), failing))
@@ -123,7 +123,7 @@ def test_download_error_becomes_readable_job_error():
 
 
 def test_download_error_logs_the_job_id_and_cause_but_keeps_the_french_message(caplog):
-    def failing(url, dest):
+    def failing(url, dest, check=None):
         raise AudioError("Impossible de télécharger l'audio : Video unavailable")
 
     caplog.set_level(logging.INFO, logger="app")
@@ -186,7 +186,7 @@ def test_job_without_frames_never_calls_the_capture(tmp_path):
 
 
 def test_failed_capture_leaves_the_job_done_without_images(tmp_path, caplog):
-    def capture(url, work_dir, out_dir):
+    def capture(url, work_dir, out_dir, check=None):
         out_dir.mkdir(parents=True)
         (out_dir / "0000.webp").touch()
         raise RuntimeError("decode failed")
@@ -270,3 +270,129 @@ def test_runs_list_carries_the_level_of_each_run():
     client = TestClient(create_app(FakeTranscriber(), fake_download))
     wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
     assert [r["level"] for r in client.get("/runs").json()["runs"]] == ["text"]
+
+
+class SlowTranscriber(FakeTranscriber):
+    """Reports progress until it is stopped, like the real one does for every segment."""
+
+    def run(self, audio, on_progress):
+        for _ in range(500):
+            time.sleep(0.01)
+            on_progress(0.1)
+        raise AssertionError("the job was never stopped")
+
+
+def test_job_past_its_time_limit_ends_in_error_and_frees_the_lock():
+    client = TestClient(create_app(SlowTranscriber(), fake_download, timeout=0.2))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.ERROR and "limite" in body["error"]
+    assert client.get(f"/runs/{job_id}").json()["state"] == "error"
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
+def test_cancel_during_transcription_ends_in_error_and_frees_the_lock():
+    client = TestClient(create_app(SlowTranscriber(), fake_download))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(client, job_id, stages=(j.TRANSCRIBING,))
+    resp = client.post(f"/jobs/{job_id}/cancel")
+    assert resp.status_code == 202 and resp.json() == {"id": job_id}
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.ERROR and body["error"] == "Transcription annulée."
+    assert client.get(f"/runs/{job_id}").json()["state"] == "error"
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
+def test_cancel_during_download_stops_the_job_before_transcription():
+    started = threading.Event()
+
+    def slow_download(url, dest, check):
+        started.set()
+        for _ in range(500):
+            time.sleep(0.01)
+            check()
+        raise AssertionError("the job was never stopped")
+
+    client = TestClient(create_app(FakeTranscriber(), slow_download))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    assert started.wait(5)
+    assert client.post(f"/jobs/{job_id}/cancel").status_code == 202
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.ERROR and body["error"] == "Transcription annulée."
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
+def test_cancel_during_capture_ends_in_error_not_done_without_images(tmp_path):
+    started = threading.Event()
+
+    def slow_capture(url, work_dir, out_dir, check):
+        out_dir.mkdir(parents=True)
+        started.set()
+        for _ in range(500):
+            time.sleep(0.01)
+            check()
+        raise AssertionError("the job was never stopped")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, slow_capture))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    assert started.wait(5)
+    client.post(f"/jobs/{job_id}/cancel")
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.ERROR and body["error"] == "Transcription annulée."
+    assert not (tmp_path / "frames" / job_id).exists()
+
+
+def test_time_limit_during_capture_keeps_the_job_done_with_the_transcript_and_no_images(tmp_path):
+    def slow_capture(url, work_dir, out_dir, check):
+        out_dir.mkdir(parents=True)
+        for _ in range(500):
+            time.sleep(0.01)
+            check()
+        raise AssertionError("the job was never stopped")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, slow_capture, 0.3))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
+    run = client.get(f"/runs/{job_id}").json()
+    assert run["state"] == "done" and run["frames"] == []
+    assert not (tmp_path / "frames" / job_id).exists()
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
+def test_time_limit_past_when_the_capture_starts_keeps_the_job_done(tmp_path):
+    gate = threading.Event()
+    threading.Timer(0.5, gate.set).start()
+
+    def never_capture(url, work_dir, out_dir, check):
+        raise AssertionError("the capture started past the time limit")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    app = create_app(FakeTranscriber(gate), fake_download, runs, never_capture, 0.2)
+    client = TestClient(app)
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
+    assert client.get(f"/runs/{job_id}").json()["frames"] == []
+
+
+def test_cancel_unknown_job_is_404_and_finished_job_is_409():
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    assert client.post("/jobs/nope/cancel").status_code == 404
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    assert wait_for(client, job_id)["stage"] == j.DONE
+    resp = client.post(f"/jobs/{job_id}/cancel")
+    assert resp.status_code == 409 and resp.json() == {"detail": "Ce job est déjà terminé."}
+
+
+def test_store_cancel_reports_unknown_finished_and_requested():
+    store = j.JobStore()
+    assert store.cancel("nope") is None
+    job = store.start()
+    assert store.cancel(job.id) is True
+    with pytest.raises(j.JobStopped, match="annulée"):
+        job.check()
+    store.fail(job, "x")
+    assert store.cancel(job.id) is False
