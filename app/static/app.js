@@ -66,6 +66,7 @@ async function readError(resp) {
 
 const KEY = "yt-transcriber-job";
 const HOTWORDS_KEY = "yt-transcriber-hotwords";
+let hotwordsDefault = null;
 const MAX_RETRIES = 5;
 
 function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY); } catch {} }
@@ -128,7 +129,11 @@ $("form").addEventListener("submit", async (ev) => {
   showVideo(null);
   jobUrl = $("url").value;
   const hotwords = $("hotwords").value;
-  try { localStorage.setItem(HOTWORDS_KEY, hotwords); } catch {}
+  // Only an edit is kept: the default stays read from the server, so a new HOTWORDS applies.
+  try {
+    if (hotwords === hotwordsDefault) localStorage.removeItem(HOTWORDS_KEY);
+    else localStorage.setItem(HOTWORDS_KEY, hotwords);
+  } catch {}
   setBusy(true);
   try {
     const resp = await fetch("/jobs", {
@@ -155,17 +160,14 @@ $("form").addEventListener("submit", async (ev) => {
 async function prefillHotwords() {
   let saved = null;
   try { saved = localStorage.getItem(HOTWORDS_KEY); } catch {}
-  if (saved !== null) {
-    $("hotwords").value = saved;
-    return;
-  }
+  if (saved !== null) $("hotwords").value = saved;
   try {
     const resp = await fetch("/hotwords");
-    if (resp.ok && !$("hotwords").value) $("hotwords").value = (await resp.json()).default;
+    if (!resp.ok) return;
+    hotwordsDefault = (await resp.json()).default;
+    if (saved === null && !$("hotwords").value) $("hotwords").value = hotwordsDefault;
   } catch {}
 }
-prefillHotwords();
-
 const resumed = remembered();
 if (resumed) {
   current = resumed;
@@ -173,6 +175,8 @@ if (resumed) {
   $("status").textContent = "Reprise du job en cours…";
   poll(resumed);
 }
+// After the resume, so its poll stays the first request of the page.
+prefillHotwords();
 
 $("cancel").addEventListener("click", async () => {
   if (!current) return;
@@ -210,7 +214,8 @@ $("download").addEventListener("click", () => {
   link.href = URL.createObjectURL(blob);
   link.download = fileName(finished?.title);
   link.click();
-  URL.revokeObjectURL(link.href);
+  // Revoked on the next tick: some browsers read the blob after click() returns.
+  setTimeout(() => URL.revokeObjectURL(link.href), 0);
 });
 
 $("copy").addEventListener("click", async () => {

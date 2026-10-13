@@ -253,7 +253,7 @@ def test_job_without_frames_never_calls_the_capture(tmp_path):
 
 
 def test_failed_capture_leaves_the_job_done_without_images(tmp_path, caplog):
-    def capture(url, work_dir, out_dir, check=None, on_info=None):
+    def capture(url, work_dir, out_dir, check=None):
         out_dir.mkdir(parents=True)
         (out_dir / "0000.webp").touch()
         raise RuntimeError("decode failed")

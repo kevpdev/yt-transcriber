@@ -156,7 +156,7 @@ def test_capture_writes_frames_and_removes_the_video(monkeypatch, tmp_path: Path
     work, out = tmp_path / "work", tmp_path / "out"
     work.mkdir()
 
-    def fake_download(url, dest, check=None, on_info=None):
+    def fake_download(url, dest, check=None):
         path = dest / "v.webm"
         path.touch()
         return path
@@ -174,12 +174,12 @@ def test_capture_removes_the_video_when_selection_raises(monkeypatch, tmp_path: 
     work = tmp_path / "work"
     work.mkdir()
 
-    def fake_download(url, dest, check=None, on_info=None):
+    def fake_download(url, dest, check=None):
         path = dest / "v.webm"
         path.touch()
         return path
 
-    def boom(video, check=None, on_info=None):
+    def boom(video, check=None):
         raise RuntimeError("decode failed")
 
     monkeypatch.setattr(frames, "download_video", fake_download)

@@ -14,7 +14,7 @@ Prérequis : Docker avec Compose, `nvidia-container-toolkit`, un GPU NVIDIA réc
 
 ## Utiliser
 
-1. Colle l'URL de la vidéo et clique sur « Transcrire », ou sur « Transcrire avec les slides » si tu veux aussi les images. Le champ « Hotwords » est prérempli avec la valeur par défaut, tu peux l'adapter à la vidéo. La page garde ta dernière saisie.
+1. Colle l'URL de la vidéo et clique sur « Transcrire », ou sur « Transcrire avec les slides » si tu veux aussi les images. Le champ « Hotwords » est prérempli avec la valeur par défaut, tu peux l'adapter à la vidéo. La page garde ta saisie quand elle diffère de la valeur par défaut, sinon elle relit le défaut du serveur à chaque ouverture.
 2. La page affiche l'étape (téléchargement, transcription, puis extraction des images avec le second bouton) et le pourcentage de la transcription. Dès que yt-dlp connaît la vidéo, une ligne montre son titre, sa chaîne et sa durée, pour vérifier que c'est la bonne avant d'attendre.
 3. Le texte arrive dans la grande zone. Le bouton aux deux feuilles superposées le copie, la flèche vers le bas le télécharge en `.txt` (le titre en première ligne, puis la vue affichée).
 
@@ -174,7 +174,7 @@ git config core.hooksPath scripts/hooks
 
 ### Tests de bout en bout de la page
 
-Treize contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`, bouton « Annuler », infos de la vidéo avant la fin du job, bouton `.txt` sans texte puis avec texte, champ hotwords), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
+Quatorze contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`, bouton « Annuler », infos de la vidéo avant la fin du job, bouton `.txt` sans texte puis avec texte, champ hotwords, hotwords par défaut non gardés), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
 
 ```sh
 scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1

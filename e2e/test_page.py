@@ -232,3 +232,14 @@ def test_hotwords_field_is_prefilled_sent_and_kept_after_reload(page, base_url, 
     assert run["settings"]["hotwords"] == "Spring Boot, Kubernetes"
     page.reload()
     expect(page.locator("#hotwords")).to_have_value("Spring Boot, Kubernetes")
+
+
+def test_hotwords_left_at_the_default_are_not_kept(page, base_url, video_url):
+    page.goto(base_url)
+    default = page.request.get(f"{base_url}/hotwords").json()["default"]
+    expect(page.locator("#hotwords")).to_have_value(default)
+    page.fill("#url", video_url)
+    page.click("#go")
+    wait_done(page)
+    # Nothing kept, so the next visit reads the default again and follows a new HOTWORDS.
+    assert page.evaluate("localStorage.getItem('yt-transcriber-hotwords')") is None
