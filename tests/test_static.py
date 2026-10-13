@@ -32,8 +32,9 @@ def test_index_route_still_serves_the_page():
     assert "/static/app.js" in resp.text
 
 
-def test_page_has_the_hotwords_field_the_video_line_and_the_txt_button():
+def test_page_has_the_video_line_and_the_txt_button_and_no_hotwords_field():
     html = make_client().get("/").text
-    assert 'id="hotwords"' in html and 'for="hotwords"' in html
+    # Hotwords are set by the calling agent through POST /jobs, not from the page.
+    assert 'id="hotwords"' not in html
     assert 'id="video"' in html
     assert 'id="download"' in html and 'aria-label="Télécharger en .txt"' in html

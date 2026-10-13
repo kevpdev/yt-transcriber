@@ -37,6 +37,7 @@ Read on demand:
 - [internal/decisions/frames-pyav.md](internal/decisions/frames-pyav.md)
 - [internal/decisions/generation-outside-app.md](internal/decisions/generation-outside-app.md)
 - [internal/decisions/lockfile.md](internal/decisions/lockfile.md)
+- [internal/decisions/openapi-contract.md](internal/decisions/openapi-contract.md)
 - [internal/decisions/page-files.md](internal/decisions/page-files.md)
 - [internal/decisions/run-storage.md](internal/decisions/run-storage.md)
 - [internal/decisions/stack.md](internal/decisions/stack.md)

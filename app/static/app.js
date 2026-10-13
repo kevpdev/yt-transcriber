@@ -46,7 +46,6 @@ function render() {
 function setBusy(busy) {
   $("go").disabled = busy;
   $("go-frames").disabled = busy;
-  $("hotwords").disabled = busy;
   $("cancel").hidden = !busy;
   $("cancel").disabled = false;
 }
@@ -65,8 +64,6 @@ async function readError(resp) {
 }
 
 const KEY = "yt-transcriber-job";
-const HOTWORDS_KEY = "yt-transcriber-hotwords";
-let hotwordsDefault = null;
 const MAX_RETRIES = 5;
 
 function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY); } catch {} }
@@ -128,18 +125,12 @@ $("form").addEventListener("submit", async (ev) => {
   $("out").value = "";
   showVideo(null);
   jobUrl = $("url").value;
-  const hotwords = $("hotwords").value;
-  // Only an edit is kept: the default stays read from the server, so a new HOTWORDS applies.
-  try {
-    if (!hotwords.trim() || hotwords === hotwordsDefault) localStorage.removeItem(HOTWORDS_KEY);
-    else localStorage.setItem(HOTWORDS_KEY, hotwords);
-  } catch {}
   setBusy(true);
   try {
     const resp = await fetch("/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: jobUrl, level, hotwords }),
+      body: JSON.stringify({ url: jobUrl, level }),
     });
     if (!resp.ok) {
       showError(await readError(resp));
@@ -157,17 +148,6 @@ $("form").addEventListener("submit", async (ev) => {
   }
 });
 
-async function prefillHotwords() {
-  let saved = null;
-  try { saved = localStorage.getItem(HOTWORDS_KEY); } catch {}
-  if (saved !== null) $("hotwords").value = saved;
-  try {
-    const resp = await fetch("/hotwords");
-    if (!resp.ok) return;
-    hotwordsDefault = (await resp.json()).default;
-    if (saved === null && !$("hotwords").value) $("hotwords").value = hotwordsDefault;
-  } catch {}
-}
 const resumed = remembered();
 if (resumed) {
   current = resumed;
@@ -175,8 +155,6 @@ if (resumed) {
   $("status").textContent = "Reprise du job en cours…";
   poll(resumed);
 }
-// After the resume, so its poll stays the first request of the page.
-prefillHotwords();
 
 $("cancel").addEventListener("click", async () => {
   if (!current) return;
