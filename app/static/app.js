@@ -150,7 +150,8 @@ $("cancel").addEventListener("click", async () => {
   try {
     const resp = await fetch(`/jobs/${current}/cancel`, { method: "POST" });
     // A 404 or 409 means the job is gone or finished: the polling shows the final state.
-    if (resp.ok) {
+    // The job may have ended while the request was in flight: keep its final status.
+    if (resp.ok && current) {
       cancelling = true;
       $("status").textContent = "Annulation…";
     }
