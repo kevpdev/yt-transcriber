@@ -23,6 +23,7 @@ let timer = null;
 let finished = null;
 let current = null;
 let cancelling = false;
+let jobUrl = "";
 
 function formatTime(seconds) {
   const total = Math.floor(seconds);
@@ -45,8 +46,17 @@ function render() {
 function setBusy(busy) {
   $("go").disabled = busy;
   $("go-frames").disabled = busy;
+  $("hotwords").disabled = busy;
   $("cancel").hidden = !busy;
   $("cancel").disabled = false;
+}
+function showVideo(job) {
+  if (!job || !job.title) {
+    $("video").textContent = "";
+    return;
+  }
+  const parts = [job.title, job.channel, job.duration != null ? formatTime(job.duration) : null];
+  $("video").textContent = parts.filter(Boolean).join(" · ");
 }
 function showError(msg) { $("error").textContent = msg || ""; }
 
@@ -55,6 +65,7 @@ async function readError(resp) {
 }
 
 const KEY = "yt-transcriber-job";
+const HOTWORDS_KEY = "yt-transcriber-hotwords";
 const MAX_RETRIES = 5;
 
 function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY); } catch {} }
@@ -89,6 +100,7 @@ async function poll(id, failures = 0) {
     return;
   }
   showError("");
+  showVideo(job);
   if (job.stage === "done") {
     finished = job;
     render();
@@ -113,12 +125,16 @@ $("form").addEventListener("submit", async (ev) => {
   finished = null;
   cancelling = false;
   $("out").value = "";
+  showVideo(null);
+  jobUrl = $("url").value;
+  const hotwords = $("hotwords").value;
+  try { localStorage.setItem(HOTWORDS_KEY, hotwords); } catch {}
   setBusy(true);
   try {
     const resp = await fetch("/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: $("url").value, level }),
+      body: JSON.stringify({ url: jobUrl, level, hotwords }),
     });
     if (!resp.ok) {
       showError(await readError(resp));
@@ -135,6 +151,20 @@ $("form").addEventListener("submit", async (ev) => {
     setBusy(false);
   }
 });
+
+async function prefillHotwords() {
+  let saved = null;
+  try { saved = localStorage.getItem(HOTWORDS_KEY); } catch {}
+  if (saved !== null) {
+    $("hotwords").value = saved;
+    return;
+  }
+  try {
+    const resp = await fetch("/hotwords");
+    if (resp.ok && !$("hotwords").value) $("hotwords").value = (await resp.json()).default;
+  } catch {}
+}
+prefillHotwords();
 
 const resumed = remembered();
 if (resumed) {
@@ -164,6 +194,23 @@ $("timestamps").addEventListener("click", () => {
   const pressed = $("timestamps").getAttribute("aria-pressed") === "true";
   $("timestamps").setAttribute("aria-pressed", String(!pressed));
   render();
+});
+
+function fileName(title) {
+  const clean = (title || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim();
+  return (clean || "transcription") + ".txt";
+}
+
+$("download").addEventListener("click", () => {
+  const text = $("out").value;
+  if (!text) return;
+  const title = finished?.title || jobUrl;
+  const blob = new Blob([title ? `${title}\n${text}` : text], { type: "text/plain;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName(finished?.title);
+  link.click();
+  URL.revokeObjectURL(link.href);
 });
 
 $("copy").addEventListener("click", async () => {

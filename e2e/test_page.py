@@ -181,3 +181,54 @@ def test_cancel_button_stops_the_job_and_frees_the_page(page, base_url, video_ur
     expect(page.locator("#status")).to_have_text(RUNNING, timeout=30_000)
     page.click("#cancel")
     expect(page.locator("#error")).to_have_text("Transcription annulée.", timeout=30_000)
+
+
+def test_video_info_shows_before_the_job_is_done(page, base_url, video_url, e2e_level):
+    submit(page, base_url, video_url)
+    expect(page.locator("#video")).not_to_be_empty(timeout=DONE_TIMEOUT)
+    assert page.inner_text("#status") != "Terminé."
+    if e2e_level == "fake":
+        expect(page.locator("#video")).to_have_text("Vidéo factice · Chaîne factice · 00:10")
+    wait_done(page)
+    expect(page.locator("#video")).not_to_be_empty()
+
+
+def test_txt_button_does_nothing_without_text(page, base_url):
+    page.goto(base_url)
+    expect(page.locator("#download")).to_have_attribute("aria-label", "Télécharger en .txt")
+    downloads = []
+    page.on("download", lambda download: downloads.append(download))
+    page.click("#download")
+    page.wait_for_timeout(500)
+    assert downloads == []
+
+
+def test_txt_button_downloads_the_title_then_the_displayed_text(page, base_url, video_url):
+    submit(page, base_url, video_url)
+    wait_done(page)
+    title = page.inner_text("#video").split(" · ")[0]
+    text = page.input_value("#out")
+    with page.expect_download() as info:
+        page.click("#download")
+    download = info.value
+    assert download.suggested_filename == f"{title}.txt"
+    path = download.path()
+    assert path is not None
+    lines = open(path, encoding="utf-8").read().split("\n", 1)
+    assert lines == [title, text]
+
+
+def test_hotwords_field_is_prefilled_sent_and_kept_after_reload(page, base_url, video_url):
+    page.goto(base_url)
+    default = page.request.get(f"{base_url}/hotwords").json()["default"]
+    expect(page.locator("#hotwords")).to_have_value(default)
+    page.fill("#hotwords", "Spring Boot, Kubernetes")
+    page.fill("#url", video_url)
+    page.click("#go")
+    expect(page.locator("#hotwords")).to_be_disabled()
+    wait_done(page)
+    expect(page.locator("#hotwords")).to_be_enabled()
+    run = page.request.get(f"{base_url}/runs/latest").json()
+    assert run["settings"]["hotwords"] == "Spring Boot, Kubernetes"
+    page.reload()
+    expect(page.locator("#hotwords")).to_have_value("Spring Boot, Kubernetes")
