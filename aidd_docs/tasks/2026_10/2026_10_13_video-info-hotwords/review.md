@@ -1,48 +1,43 @@
-# Review: infos vidéo, export .txt et hotwords modifiables (#10)
+# Review: infos vidéo, export .txt et hotwords modifiables (#10), correctifs de revue
 
-- **Verdict**: changes-requested
-- **Diff**: `main...feat/video-info-hotwords`
+- **Verdict**: approve
+- **Diff**: `e4e9bc7...b6b07f4`
 - **Axes run**: code, functional, relevancy
 - **Date**: 2026_10_13
-- **Findings**: 1 critical, 2 warning, 3 minor
+- **Findings**: 0 critical, 0 warning, 2 minor
 
 ## Phases
 
 ### Phase 1 — Infos vidéo publiées par le job dès l'extraction des métadonnées
 
-- [x] `download_audio` appelle `on_info` avec titre, chaîne (ou uploader) et durée avant tout téléchargement, jamais pour un direct en cours — `app/audio.py:64-69`, `tests/test_audio.py:60-72`
-- [x] `GET /jobs/{id}` renvoie `title`, `channel`, `duration` dès `downloading`, `null` avant, corps validé par `JobView` — `app/jobs.py:71-73`, `app/contract.py:55-57`, `tests/test_jobs.py:164-193`
+- [x] Faux de capture sans `on_info` mort (finding #4 de la revue précédente) — `tests/test_frames.py:159,177,182`, `tests/test_jobs.py:256`
 
 ### Phase 2 — Hotwords par job et route de la valeur par défaut
 
-- [x] Le transcriber reçoit les hotwords du job, `GET /runs/{id}` montre la même valeur dans `settings.hotwords` — `app/main.py:127,169`, `tests/test_jobs.py:197-208`
-- [x] Sans champ, `null` ou vide, le job utilise `HOTWORDS`, une valeur non textuelle ou trop longue reçoit `422` en français — `app/main.py:210-219`, `tests/test_jobs.py:211-216`
-- [x] `GET /hotwords` renvoie `HOTWORDS` lu à l'appel, le schéma publié la décrit — `app/main.py:256-258`, `tests/test_contract.py:21,126`
+- [x] Inchangée par le delta, critères tenus à la revue précédente — `app/main.py:210-219,256-258`
 
 ### Phase 3 — Page, e2e, mémoire et README
 
-- [x] Pendant le job, la page affiche titre, chaîne et durée avant « Terminé » — `app/static/app.js:103`, `e2e/test_page.py:186`
-- [x] Le fichier téléchargé a le titre en première ligne et la vue affichée ensuite — `app/static/app.js:204-214`, `e2e/test_page.py:206`
-- [x] Le champ est prérempli, garde la saisie après rechargement, le run enregistre la valeur envoyée — `app/static/app.js:155-167`, `e2e/test_page.py:221`
-- [x] `scripts/e2e.sh fake` passe avec les nouveaux scénarios — rapporté `13 passed`, 13 `def test_` comptés dans `e2e/test_page.py`
-- [ ] Aucune ligne de la mémoire ni du README ne contredit le nouveau comportement — `README.md:32` promet que `HOTWORDS="..." docker compose up` change les hotwords, faux pour la page dès le premier job (voir finding critique)
+- [x] Une saisie égale au défaut n'est plus gardée, un nouveau `HOTWORDS` atteint la page — `app/static/app.js:133-136,167-168`, `e2e/test_page.py:237-245`
+- [x] Le champ édité reste gardé après rechargement — `app/static/app.js:166`, `e2e/test_page.py:221`
+- [x] La reprise d'un job reste la première requête de la page — `app/static/app.js:171-179`
+- [x] Révocation du blob différée — `app/static/app.js:217-218`
+- [x] `maxlength` relié à `MAX_HOTWORDS` — `app/static/index.html:69`
+- [x] `scripts/e2e.sh fake` passe avec le nouveau scénario — rapporté `14 passed`, 14 `def test_` comptés à `b6b07f4`
+- [x] Aucune ligne de la mémoire ni du README ne contredit le comportement — `README.md:17,177`, `aidd_docs/memory/forms.md:13`, `aidd_docs/memory/testing.md:30`
 
 ## Findings
 
 | Sev | Kind | Phase | Location | Issue | Fix |
 | --- | ---- | ----- | -------- | ----- | --- |
-| 🔴 | fit | 3 | `app/static/app.js:131` | Chaque soumission écrit la valeur du champ dans `localStorage`, y compris la valeur par défaut préremplie. Au rechargement suivant, `prefillHotwords` (`:158`) prend cette copie et n'appelle plus `GET /hotwords`. Scénario : premier job avec le défaut `Claude Code, ...`, puis `HOTWORDS="Spring Boot" docker compose up` : la page renvoie encore `Claude Code, ...` et le serveur l'utilise. `HOTWORDS` cesse d'être le défaut de la page après un seul job, contraire au critère 3 de l'issue et à l'exemple de `README.md:32`. | Ne garder la saisie que si elle diffère du défaut renvoyé par `GET /hotwords`, sinon `localStorage.removeItem(HOTWORDS_KEY)`. |
-| 🟡 | functional | 3 | `README.md:32` | Critère « aucune ligne ne contredit » non tenu, conséquence du finding précédent : l'exemple `HOTWORDS=...` est faux pour un navigateur qui a déjà lancé un job. | Se résout avec le correctif de `app.js:131`, sinon documenter que la page garde sa dernière saisie au-dessus de `HOTWORDS`. |
-| 🟡 | code | 3 | `app/static/app.js:213` | `URL.revokeObjectURL` est appelé de façon synchrone juste après `link.click()`. Passe sous Chromium (e2e), mais révoquer avant que le navigateur ait lu le blob est un échec connu de certains navigateurs (supposé pour Firefox et Safari, non mesuré ici). | `setTimeout(() => URL.revokeObjectURL(href), 0)` ou plus long. |
-| 🟢 | rot | 1 | `tests/test_frames.py:159,177,182`, `tests/test_jobs.py:256` | `on_info=None` ajouté aux faux de `download_video`, de la sélection et de `capture`, dont les vraies signatures (`app/frames.py:40,136`) n'ont pas changé. Paramètre mort qui laisse croire que la capture reçoit les infos. | Retirer `on_info` de ces quatre faux. |
-| 🟢 | rot | 3 | `app/static/index.html:69` | `maxlength="500"` recopie `MAX_HOTWORDS` (`app/main.py:34`). Si la borne serveur change, la page tronque en silence à l'ancienne valeur. | Accepter la copie avec un commentaire qui pointe `MAX_HOTWORDS`, ou retirer `maxlength` et laisser le `422` français parler. |
-| 🟢 | rot | 3 | `aidd_docs/memory/api.md:20-21` | Les deux puces sont rangées sous « What the schema does not say » alors que `title`, `channel`, `duration` et `hotwords` (avec `maxLength`) sont dans le schéma. La normalisation des hotwords est aussi décrite trois fois (`api.md`, `architecture.md:33`, `README.md:32`). | Garder dans `api.md` seulement ce que le schéma ne dit pas (moment de `on_info`, blanc vaut défaut, `422` français), et pointer depuis `architecture.md`. |
+| 🟢 | code | 3 | `app/static/app.js:133-136` | Si l'utilisateur soumet avant la réponse de `GET /hotwords`, ou si cette requête échoue, `hotwordsDefault` vaut `null` et le champ encore vide est gardé sous la forme `""`. Le serveur applique bien `HOTWORDS`, mais le champ reste vide à chaque visite au lieu de montrer le défaut. La fenêtre fait quelques millisecondes en local. | Traiter le vide comme le défaut : `if (!hotwords \|\| hotwords === hotwordsDefault) removeItem`. |
+| 🟢 | rot | 3 | `aidd_docs/memory/api.md:20-21` | Reporté de la revue précédente (#6), non traité : puces rangées sous « What the schema does not say » pour des champs présents dans le schéma, normalisation décrite trois fois. | Ne garder dans `api.md` que ce que le schéma ne dit pas. |
 
 ## Verification
 
 | Metric        | Value                                             |
 | ------------- | ------------------------------------------------- |
-| Verified      | 90% (9/10)                                        |
-| Files checked | app/audio.py, app/contract.py, app/fake.py, app/jobs.py, app/main.py, app/transcribe.py, app/static/app.js, app/static/index.html, tests/test_audio.py, tests/test_contract.py, tests/test_frames.py, tests/test_jobs.py, tests/test_runs.py, tests/test_static.py, e2e/test_page.py, README.md, aidd_docs/memory/{api,architecture,design,forms,project-brief,testing}.md |
-| Unchecked     | Phase 3, critère 5 (mémoire et README sans contradiction) — fix |
-| Unplanned     | `on_info=None` ajouté aux faux de capture de `tests/test_frames.py` et `tests/test_jobs.py:256`, hors projection de la phase 1 |
+| Verified      | 100% (10/10)                                      |
+| Files checked | app/static/app.js, app/static/index.html, e2e/test_page.py, tests/test_frames.py, tests/test_jobs.py, README.md, aidd_docs/memory/forms.md, aidd_docs/memory/testing.md |
+| Unchecked     | none                                              |
+| Unplanned     | none                                              |

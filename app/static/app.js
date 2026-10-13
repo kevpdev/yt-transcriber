@@ -131,7 +131,7 @@ $("form").addEventListener("submit", async (ev) => {
   const hotwords = $("hotwords").value;
   // Only an edit is kept: the default stays read from the server, so a new HOTWORDS applies.
   try {
-    if (hotwords === hotwordsDefault) localStorage.removeItem(HOTWORDS_KEY);
+    if (!hotwords.trim() || hotwords === hotwordsDefault) localStorage.removeItem(HOTWORDS_KEY);
     else localStorage.setItem(HOTWORDS_KEY, hotwords);
   } catch {}
   setBusy(true);
