@@ -45,13 +45,7 @@ Pour le suivre en direct dans un GUI, ouvre `data/runs.db` en lecture seule, par
 
 Pour passer la version de Docker : `HOST_DOCKER_VERSION=$(docker version -f '{{.Server.Version}}') docker compose up --build`.
 
-Lire le dernier run réussi et sa transcription horodatée par l'API :
-
-```sh
-curl -s localhost:8000/runs/latest
-curl -s localhost:8000/runs/<id>/markdown
-curl -so 0000.webp localhost:8000/runs/<id>/frames/0000.webp   # une image, URL donnée par `frames[].url`
-```
+Pour relire un run et ses images par l'API, voir [Piloter l'app depuis un agent](#piloter-lapp-depuis-un-agent).
 
 Lire la télémétrie des derniers runs, erreurs comprises :
 
@@ -178,7 +172,7 @@ git config core.hooksPath scripts/hooks
 
 ### Tests de bout en bout de la page
 
-Sept contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
+Huit contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
 
 ```sh
 scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1
