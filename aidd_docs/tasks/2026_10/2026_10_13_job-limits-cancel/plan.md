@@ -1,5 +1,5 @@
 ---
-objective: "Aucun job ne garde le GPU indéfiniment : un direct en cours est refusé, un job trop long ou annulé passe en `error` et libère le verrou, et Compose n'affiche `healthy` qu'une fois le modèle chargé."
+objective: "Aucun job ne garde le GPU indéfiniment : un direct en cours est refusé, un job trop long ou annulé s'arrête et libère le verrou, et Compose n'affiche `healthy` qu'une fois le modèle chargé."
 status: implemented
 ---
 
