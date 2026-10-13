@@ -362,6 +362,22 @@ def test_time_limit_during_capture_keeps_the_job_done_with_the_transcript_and_no
     assert client.post("/jobs", json={"url": URL}).status_code == 202
 
 
+def test_time_limit_past_when_the_capture_starts_keeps_the_job_done(tmp_path):
+    gate = threading.Event()
+    threading.Timer(0.5, gate.set).start()
+
+    def never_capture(url, work_dir, out_dir, check):
+        raise AssertionError("the capture started past the time limit")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    app = create_app(FakeTranscriber(gate), fake_download, runs, never_capture, 0.2)
+    client = TestClient(app)
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
+    assert client.get(f"/runs/{job_id}").json()["frames"] == []
+
+
 def test_cancel_unknown_job_is_404_and_finished_job_is_409():
     client = TestClient(create_app(FakeTranscriber(), fake_download))
     assert client.post("/jobs/nope/cancel").status_code == 404
