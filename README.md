@@ -78,6 +78,7 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 Le contrat est publié par l'app elle-même : `http://localhost:8000/openapi.json`, lisible dans `http://localhost:8000/docs`. Il donne chaque route, ses paramètres et le schéma de chaque réponse, succès et erreurs.
 
 - On lance un job avec `POST /jobs`, puis on interroge `GET /jobs/{id}` jusqu'à `done` ou `error`. Un seul job à la fois : le second reçoit `409`.
+- Un job ne garde pas le GPU indéfiniment : il s'arrête en `error` au bout de 15 minutes, ou sur `POST /jobs/{id}/cancel` (`202` accepté, `404` inconnu, `409` déjà fini). L'arrêt est coopératif, il prend effet au prochain point de passage : quelques secondes, ou le temps du premier segment transcrit. Un direct en cours ou programmé est refusé avant tout téléchargement, un direct terminé est accepté.
 - Les runs terminés se relisent par `GET /runs`, `GET /runs/latest` (le dernier run réussi), `GET /runs/{id}`, sa vue `GET /runs/{id}/markdown` et ses slides `GET /runs/{id}/frames/{name}`.
 - Les erreurs sont `{"detail": "..."}`, en français.
 
@@ -87,7 +88,7 @@ Cette section suffit à un agent, ou au skill qui le pilote, pour transcrire une
 
 ### Le cycle
 
-1. **Lancer l'app** avec `docker compose up --build -d`. Le modèle se charge avant que le serveur accepte une connexion : tant que `curl` sur `/` échoue, l'app n'est pas prête. Au premier démarrage, le modèle (1,6 Go) est d'abord téléchargé. Si le conteneur s'arrête (`docker compose ps` vide), le modèle n'a pas pu se charger, ses logs disent pourquoi.
+1. **Lancer l'app** avec `docker compose up --build -d`. Le modèle se charge avant que le serveur accepte une connexion : tant que `curl` sur `/` échoue, l'app n'est pas prête. `docker compose ps` affiche `health: starting` pendant ce temps, puis `healthy` (le healthcheck interroge `GET /`). Au premier démarrage, le modèle (1,6 Go) est d'abord téléchargé. Si le conteneur s'arrête (`docker compose ps` vide), le modèle n'a pas pu se charger, ses logs disent pourquoi.
 2. **Lancer un job** avec `POST /jobs`, le niveau `frames` pour avoir aussi les slides. La réponse `202` donne l'id du job.
 3. **Sonder le job** avec `GET /jobs/{id}` toutes les 2 secondes, jusqu'à ce que `stage` vaille `done` ou `error`. Un `404` veut dire que l'app a redémarré : passer à l'étape 4.
 4. **Relire le run** avec `GET /runs/{id}`, le même id que le job. La ligne est écrite avant que le job passe à `done` ou `error`, donc elle existe dès que l'étape 3 s'arrête, y compris pour un échec. Seule exception, une écriture en base qui a échoué : elle est dans les logs du conteneur et la route répond `404`. `GET /runs/latest` renvoie le dernier run réussi, qui est le tien si tu es le seul client.
@@ -103,12 +104,14 @@ Les routes, leurs paramètres et le schéma de chaque réponse sont dans `http:/
 | `POST /jobs` | `202` | sonder le job |
 | `POST /jobs` | `409` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
 | `POST /jobs` | `422` | corriger la requête, réessayer ne sert à rien |
+| `POST /jobs/{id}/cancel` | `202` | l'arrêt est demandé, continuer à sonder : le job passe en `error` avec « Transcription annulée. » |
+| `POST /jobs/{id}/cancel` | `404` / `409` | job inconnu (redémarrage) / déjà fini : le sondage fait foi |
 | `GET /jobs/{id}` | `404` | les jobs vivent en mémoire, un redémarrage les perd. Le run fini reste lisible par `GET /runs/{id}` |
 | `GET /runs/{id}` | `404` | id inconnu, job pas encore fini, ou écriture du run échouée |
 | `GET /runs/latest` | `404` | aucun run réussi pour l'instant |
 | `GET /runs/{id}/frames/{name}` | `404` | run inconnu, nom absent de `frames`, ou fichier effacé du disque |
 
-Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
+Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job qui dépasse 15 minutes finit en `error` avec un message qui cite la limite, et un direct en cours finit en `error` sans téléchargement. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
 
 ### Exemple complet
 
@@ -171,7 +174,7 @@ git config core.hooksPath scripts/hooks
 
 ### Tests de bout en bout de la page
 
-Huit contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
+Neuf contrôles Playwright (URL invalide, rechargement, coupure réseau, job inconnu, copie, bascule de l'horodatage, thème, bouton des slides avec l'étape `extracting`, bouton « Annuler »), dans `e2e/`, rejoués à deux niveaux. Ils sont hors de `scripts/check.sh`.
 
 ```sh
 scripts/e2e.sh fake   # Docker seul, sans GPU ni YouTube : l'appli tourne avec YT_FAKE=1

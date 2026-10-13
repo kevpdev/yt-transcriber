@@ -18,6 +18,7 @@ The HTTP API surface: its style, where the contract lives, and what the schema c
 ## What the schema does not say
 
 - Errors are `{"detail": "<message>"}`, written in French for the end user, never a stack trace. The exception is a `POST /jobs` body that is not the expected JSON, which gets the English list of the validation library.
+- A job that runs past `JOB_TIMEOUT_S` (900 s, `create_app(timeout=...)`) or is cancelled ends in `error` with a French message and frees the lock. `POST /jobs/{job_id}/cancel` answers `202 {"id"}` (stop requested, effective at the next checkpoint), `404` for an unknown job and `409` for a finished one. A live in progress (`live_status` `is_live` or `is_upcoming`) is refused before any download with an `AudioError`, a finished live is accepted.
 - A second `POST /jobs` gets `409` until the first is `done` or `error`. The `409` carries no id of the running job, the caller retries later. Why one job at a time, the polling and what a restart loses are in `architecture.md`. Runs are the finished jobs, read back from SQLite.
 - The server accepts no connection before the model is loaded (lifespan), so a failed connection on `/` means "not ready yet".
 - The run id is the job id. The `runs` row is written before the job turns `done` or `error`, so `GET /runs/{id}` answers as soon as polling stops, errors included. The one exception is a failed storage write, logged, which leaves the job `done` and the route `404`.
