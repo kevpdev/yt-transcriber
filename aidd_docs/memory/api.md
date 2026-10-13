@@ -24,7 +24,8 @@ The HTTP API surface: its style, the main resources, and the contracts.
 The README section « Piloter l'app depuis un agent » is the contract an agent follows without reading the code, with a runnable `curl` and `jq` example. It rests on these invariants, keep them true or update that section:
 
 - The server accepts no connection before the model is loaded (lifespan), so a refused connection on `/` means "not ready yet".
-- The run id is the job id. The `runs` row is written before the job turns `done` or `error`, so `GET /runs/{id}` answers as soon as polling stops, errors included (`state: "error"`).
+- The run id is the job id. The `runs` row is written before the job turns `done` or `error`, so `GET /runs/{id}` answers as soon as polling stops, errors included (`state: "error"`). The one exception is a failed storage write, logged, which leaves the job `done` and the route `404`.
+- A `404` on `GET /jobs/{id}` means the app restarted, since jobs live in memory, so the caller stops polling and reads `GET /runs/{id}`.
 - `GET /runs/latest` only sees `done` runs, so it is the caller's run only when there is a single client.
 - `409` carries no id of the running job, the caller retries later.
 - A `frames` job can end `done` with an empty `frames` list when the capture failed.

@@ -93,50 +93,71 @@ Cette section suffit à un agent, ou au skill qui le pilote, pour transcrire une
 
 ### Le cycle
 
-1. **Lancer l'app** avec `docker compose up --build -d`. Le modèle se charge avant que le serveur accepte une connexion : tant que `curl` sur `/` est refusé, l'app n'est pas prête. Au premier démarrage, le modèle (1,6 Go) est d'abord téléchargé.
+1. **Lancer l'app** avec `docker compose up --build -d`. Le modèle se charge avant que le serveur accepte une connexion : tant que `curl` sur `/` échoue, l'app n'est pas prête. Au premier démarrage, le modèle (1,6 Go) est d'abord téléchargé. Si le conteneur s'arrête (`docker compose ps` vide), le modèle n'a pas pu se charger, ses logs disent pourquoi.
 2. **Lancer un job** avec `POST /jobs` et `{"url": "<URL YouTube>", "level": "frames"}`. `level` vaut `text` (défaut, transcription seule) ou `frames` (transcription puis capture des slides). La réponse `202 {"id": "..."}` donne l'id du job.
-3. **Sonder le job** avec `GET /jobs/{id}` toutes les 2 secondes, jusqu'à ce que `stage` vaille `done` ou `error`. Les étapes passent par `queued`, `downloading`, `transcribing` (avec `progress` de 0 à 1), puis `extracting` au niveau `frames`. En `error`, le champ `error` porte le message.
-4. **Relire le run** avec `GET /runs/{id}`, le même id que le job. La ligne est écrite avant que le job passe à `done` ou `error`, donc elle existe dès que l'étape 3 s'arrête, y compris pour un échec (`state` vaut alors `error`). `GET /runs/latest` renvoie le dernier run réussi, qui est le tien si tu es le seul client. `GET /runs/{id}/markdown` donne le transcript horodaté.
+3. **Sonder le job** avec `GET /jobs/{id}` toutes les 2 secondes, jusqu'à ce que `stage` vaille `done` ou `error`. Les étapes passent par `queued`, `downloading`, `transcribing` (avec `progress` de 0 à 1), puis `extracting` au niveau `frames`. En `error`, le champ `error` porte le message. Un `404` veut dire que l'app a redémarré : passer à l'étape 4.
+4. **Relire le run** avec `GET /runs/{id}`, le même id que le job. La ligne est écrite avant que le job passe à `done` ou `error`, donc elle existe dès que l'étape 3 s'arrête, y compris pour un échec (`state` vaut alors `error`). Seule exception, une écriture en base qui a échoué : elle est dans les logs du conteneur et la route répond `404`. `GET /runs/latest` renvoie le dernier run réussi, qui est le tien si tu es le seul client. `GET /runs/{id}/markdown` donne le transcript horodaté.
 5. **Télécharger les images** : chaque élément de `frames` porte `position`, `time` (secondes dans la vidéo) et `url`, une route relative à préfixer par `http://localhost:8000`. La réponse est un fichier `image/webp`.
 6. **Arrêter l'app** avec `docker compose down`, jamais `down -v` qui efface le modèle en cache. L'historique dans `data/` survit dans les deux cas.
 
 ### Les codes à traiter
 
+Les routes et leurs champs sont décrits dans la section API ci-dessus. Ce tableau dit quoi faire de chaque réponse.
+
 | Appel | Code | Corps | Quoi faire |
 | --- | --- | --- | --- |
 | `POST /jobs` | `202` | `{"id"}` | sonder le job |
 | `POST /jobs` | `409` | `{"detail": "Une transcription est déjà en cours, attends qu'elle se termine."}` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
-| `POST /jobs` | `422` | `{"detail": "..."}` | URL qui n'est pas YouTube, ou `level` autre que `text` ou `frames`. Corriger la requête, réessayer ne sert à rien |
+| `POST /jobs` | `422` | `{"detail": "..."}`, une liste au lieu d'un texte si le corps n'est pas un JSON valide | URL qui n'est pas YouTube, `level` autre que `text` ou `frames`, ou corps mal formé. Corriger la requête, réessayer ne sert à rien |
 | `GET /jobs/{id}` | `404` | `{"detail": "Job inconnu."}` | les jobs vivent en mémoire, un redémarrage les perd. Le run fini reste lisible par `GET /runs/{id}` |
-| `GET /runs/{id}` | `404` | `{"detail": "Run inconnu."}` | id inconnu, ou job pas encore fini |
+| `GET /runs/{id}` | `404` | `{"detail": "Run inconnu."}` | id inconnu, job pas encore fini, ou écriture du run échouée |
 | `GET /runs/latest` | `404` | `{"detail": "Aucun run réussi."}` | aucun run en état `done` |
+| `GET /runs/{id}/frames/{name}` | `404` | `{"detail": "Run inconnu."}` | id de run inconnu |
 | `GET /runs/{id}/frames/{name}` | `404` | `{"detail": "Image inconnue."}` | nom absent de `frames` du run, ou fichier effacé du disque |
 
 Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
 
 ### Exemple complet
 
+Un script à enregistrer, par exemple sous `transcrire.sh`, et à lancer avec `sh transcrire.sh`. Il s'arrête avec un code non nul sur chaque cas du tableau qui empêche d'aller au bout.
+
 ```sh
 BASE=http://localhost:8000
-until curl -s -o /dev/null "$BASE/"; do sleep 5; done        # 1. attendre le modèle
 
-ID=$(curl -s -X POST "$BASE/jobs" -H 'Content-Type: application/json' \
-  -d '{"url": "https://www.youtube.com/watch?v=KnXm3PbNz5A", "level": "frames"}' | jq -r .id)
-echo "job $ID"                                                 # 2. "null" si 409 ou 422
-
-until curl -s "$BASE/jobs/$ID" | jq -e '.stage == "done" or .stage == "error"' >/dev/null; do
-  sleep 2                                                      # 3. sonder
+# 1. attendre le modèle, 10 minutes au plus
+i=0
+until curl -s -o /dev/null "$BASE/"; do
+  i=$((i + 1)); [ "$i" -lt 120 ] || { echo "app pas prête"; exit 1; }
+  sleep 5
 done
 
-curl -s "$BASE/runs/$ID" \
-  | jq '{state, error, title, language, word_count, frames: (.frames | length)}'   # 4. relire
-curl -s "$BASE/runs/latest" | jq -r .id                        #    même id si le job a réussi
+# 2. lancer : 202 donne l'id, 409 ou 422 arrête
+CODE=$(curl -s -o job.json -w '%{http_code}' -X POST "$BASE/jobs" \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://www.youtube.com/watch?v=KnXm3PbNz5A", "level": "frames"}')
+[ "$CODE" = 202 ] || { echo "POST /jobs $CODE"; cat job.json; exit 1; }
+ID=$(jq -r .id job.json)
+echo "job $ID"
 
-FRAME=$(curl -s "$BASE/runs/$ID" | jq -r '.frames[0].url')
-curl -s -o slide.webp -w '%{http_code} %{content_type}\n' "$BASE$FRAME"   # 5. une image
+# 3. sonder jusqu'à done ou error, ou jusqu'à un 404 si l'app a redémarré
+while CODE=$(curl -s -o job.json -w '%{http_code}' "$BASE/jobs/$ID"); [ "$CODE" = 200 ]; do
+  jq -e '.stage == "done" or .stage == "error"' job.json >/dev/null && break
+  sleep 2
+done
+
+# 4. relire le run par l'id du job, puis le dernier run réussi
+CODE=$(curl -s -o run.json -w '%{http_code}' "$BASE/runs/$ID")
+[ "$CODE" = 200 ] || { echo "GET /runs/$ID $CODE"; exit 1; }
+jq '{state, error, title, language, word_count, frames: (.frames | length)}' run.json
+curl -s "$BASE/runs/latest" | jq -r .id   # le même id si le job a réussi
+
+# 5. télécharger la première image
+FRAME=$(jq -r '.frames[0].url // empty' run.json)
+[ -n "$FRAME" ] || { echo "aucune image"; exit 1; }
+curl -s -o slide.webp -w '%{http_code} %{content_type}\n' "$BASE$FRAME"
 ```
 
-Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 52 s de bout en bout, run `done` en français, 3 680 mots, 49 images, et `200 image/webp` pour la première.
+Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 54 s de bout en bout, run `done` en français, 3 680 mots, 49 images, et `200 image/webp` pour la première. Un second lancement pendant le premier s'est arrêté sur `POST /jobs 409`.
 
 ## Tests
 
