@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import contract as c
 from . import jobs as j
@@ -41,9 +41,14 @@ def with_frame_urls(run: dict) -> dict:
 
 
 class JobRequest(BaseModel):
-    url: str = ""
+    url: str = Field("", description="A YouTube video URL.")
     # Any type: a null or a number gets the French 422 below, not the pydantic one.
-    level: Any = None
+    # The enum is published in the schema only, it is checked by `create_job`.
+    level: Any = Field(
+        None,
+        description="`frames` also captures the slides. Missing or null means `text`.",
+        json_schema_extra={"enum": [*LEVELS, None], "default": "text"},
+    )
 
 
 def create_app(
@@ -260,7 +265,10 @@ def create_app(
         response_class=Response,
         responses={
             200: c.content(
-                "text/markdown", c.TEXT, "A title, then one `[mm:ss] text` line per segment."
+                "text/markdown",
+                c.TEXT,
+                "UTF-8. `# <title, or the video_id without one>`, a blank line, then one "
+                "`[mm:ss] text` line per segment, `[h:mm:ss]` from one hour.",
             ),
             404: c.error("Unknown run."),
         },

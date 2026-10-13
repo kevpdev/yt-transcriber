@@ -26,10 +26,10 @@ EXPECTED = {
 }
 
 
-def missing_schemas(spec: dict) -> list[str]:
+def missing_schemas(document: dict) -> list[str]:
     """Each response of each operation that publishes no body, or an empty schema."""
     missing = []
-    for path, operations in spec["paths"].items():
+    for path, operations in document["paths"].items():
         for method, operation in operations.items():
             for code, response in operation["responses"].items():
                 content = response.get("content") or {}
@@ -38,12 +38,12 @@ def missing_schemas(spec: dict) -> list[str]:
     return missing
 
 
-def spec_of(app) -> dict:
-    return app.openapi()
+def spec() -> dict:
+    return create_app(FakeTranscriber(), fake_download).openapi()
 
 
 def test_every_response_of_every_route_has_a_schema():
-    assert missing_schemas(spec_of(create_app(FakeTranscriber(), fake_download))) == []
+    assert missing_schemas(spec()) == []
 
 
 def test_a_route_without_a_response_model_is_caught():
@@ -53,14 +53,14 @@ def test_a_route_without_a_response_model_is_caught():
     def undeclared():
         return {}
 
-    assert missing_schemas(spec_of(app)) == ["GET /undeclared 200"]
+    assert missing_schemas(app.openapi()) == ["GET /undeclared 200"]
 
 
 def test_every_route_declares_its_success_and_error_codes():
-    spec = spec_of(create_app(FakeTranscriber(), fake_download))
+    published = spec()
     declared = {
         (method, path): {code for code, resp in op["responses"].items() if not generated(resp)}
-        for path, ops in spec["paths"].items()
+        for path, ops in published["paths"].items()
         for method, op in ops.items()
     }
     assert declared == EXPECTED
@@ -73,7 +73,7 @@ def generated(response: dict) -> bool:
 
 
 def test_errors_are_the_french_detail_and_bodies_that_are_not_json_say_their_media_type():
-    paths = spec_of(create_app(FakeTranscriber(), fake_download))["paths"]
+    paths = spec()["paths"]
 
     def content(path: str, method: str, code: str) -> dict:
         return paths[path][method]["responses"][code]["content"]
@@ -84,6 +84,11 @@ def test_errors_are_the_french_detail_and_bodies_that_are_not_json_say_their_med
     assert set(content("/runs/{run_id}/markdown", "get", "200")) == {"text/markdown"}
     assert set(content("/runs/{run_id}/frames/{name}", "get", "200")) == {"image/webp"}
     assert [p["name"] for p in paths["/runs"]["get"]["parameters"]] == ["limit", "offset"]
+
+
+def test_job_request_publishes_the_levels_it_accepts():
+    level = spec()["components"]["schemas"]["JobRequest"]["properties"]["level"]
+    assert level["enum"] == ["text", "frames", None]
 
 
 def check(resp, status: int, model: type[BaseModel]) -> dict:
