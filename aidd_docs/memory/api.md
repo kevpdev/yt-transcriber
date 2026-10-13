@@ -10,10 +10,10 @@ The HTTP API surface: its style, where the contract lives, and what the schema c
 ## Contract
 
 - `/openapi.json` is the contract: every route, its parameters, the schema of its success and of each error code, and the media type of the bodies that are not JSON. `/docs` renders it. Read them for the fields, not this file.
-- The response models live in `app/contract.py`. Routes declare them with `responses=`, never `response_model=`, so they describe the bodies without filtering or re-serializing them. `tests/test_contract.py` fails when a route publishes an empty schema or omits a code, and validates the real bodies against the models (`extra="forbid"`).
+- The response models live in `app/contract.py`. Routes declare them with `responses=`, never `response_model=`, so they describe the bodies without filtering or re-serializing them. `tests/test_contract.py` fails when a route publishes an empty schema or omits a code, and validates the real bodies against the models (`extra="forbid"`). The decision and its alternatives: `internal/decisions/openapi-contract.md`.
 - A new route or a changed body updates `app/contract.py` and the `EXPECTED` table of `tests/test_contract.py` in the same change.
-- FastAPI adds a `422` with its own validation schema to every route with a path parameter. It never fires, a string path parameter always validates. Kept on purpose, see issue #66.
-- The schema gives `level` the default `"text"`, while `JobRequest.level` defaults to `None`. The effect is the same, a null means `text`. Kept on purpose, see issue #66: removing either gap means overriding FastAPI's schema generation for a cosmetic gain.
+- FastAPI adds a `422` with its own validation schema to every route with a path parameter. It never fires, a string path parameter always validates. Kept on purpose, see issue #66 and `internal/decisions/openapi-contract.md`.
+- The schema gives `level` the default `"text"`, while `JobRequest.level` defaults to `None`. The effect is the same, a null means `text`. Kept on purpose, see issue #66 and `internal/decisions/openapi-contract.md`: removing either gap means overriding FastAPI's schema generation for a cosmetic gain.
 
 ## What the schema does not say
 
