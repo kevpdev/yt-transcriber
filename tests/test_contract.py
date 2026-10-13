@@ -105,6 +105,7 @@ def test_real_job_bodies_match_their_published_models():
     job_id = check(client.post("/jobs", json={"url": URL}), 202, c.JobCreated)["id"]
     check(client.get(f"/jobs/{job_id}"), 200, c.JobView)
     check(client.post("/jobs", json={"url": URL}), 409, c.Detail)
+    check(client.post(f"/jobs/{job_id}/cancel"), 202, c.JobCancel)
     gate.set()
     wait_for(client, job_id)
     check(client.get(f"/jobs/{job_id}"), 200, c.JobView)

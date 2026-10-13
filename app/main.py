@@ -73,12 +73,17 @@ def create_app(
     app = FastAPI(lifespan=lifespan)
 
     def capture_images(job: j.Job, url: str, work_dir: Path, out_dir: Path) -> list[Frame]:
-        # Losing a transcript for a failed image costs more than having no images.
+        # Losing a transcript for a failed image or a late capture costs more than having no
+        # images. Only an explicit cancel ends the job in error.
         try:
             return capture(url, work_dir, out_dir, job.check)
-        except j.JobStopped:
+        except j.JobStopped as exc:
             shutil.rmtree(out_dir, ignore_errors=True)
-            raise
+            if exc.cancelled:
+                raise
+            # The time limit hit during the capture: keep the transcript, drop the images.
+            log.warning("Capture of run %s stopped by the time limit: %s", job.id, exc)
+            return []
         except Exception:  # noqa: BLE001 - the job stays done, without images
             log.exception("Could not capture frames for run %s", job.id)
             shutil.rmtree(out_dir, ignore_errors=True)
@@ -202,7 +207,7 @@ def create_app(
         "/jobs/{job_id}/cancel",
         status_code=202,
         responses={
-            202: {"model": c.JobCreated, "description": "Stop requested, poll the job."},
+            202: {"model": c.JobCancel, "description": "Stop requested, poll the job."},
             404: c.error("Unknown job."),
             409: c.error("The job is already finished."),
         },

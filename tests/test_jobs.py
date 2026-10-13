@@ -343,6 +343,25 @@ def test_cancel_during_capture_ends_in_error_not_done_without_images(tmp_path):
     assert not (tmp_path / "frames" / job_id).exists()
 
 
+def test_time_limit_during_capture_keeps_the_job_done_with_the_transcript_and_no_images(tmp_path):
+    def slow_capture(url, work_dir, out_dir, check):
+        out_dir.mkdir(parents=True)
+        for _ in range(500):
+            time.sleep(0.01)
+            check()
+        raise AssertionError("the job was never stopped")
+
+    runs = RunStore(str(tmp_path / "runs.db"))
+    client = TestClient(create_app(FakeTranscriber(), fake_download, runs, slow_capture, 0.3))
+    job_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
+    body = wait_for(client, job_id)
+    assert body["stage"] == j.DONE and body["text"] == "bonjour le monde"
+    run = client.get(f"/runs/{job_id}").json()
+    assert run["state"] == "done" and run["frames"] == []
+    assert not (tmp_path / "frames" / job_id).exists()
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
 def test_cancel_unknown_job_is_404_and_finished_job_is_409():
     client = TestClient(create_app(FakeTranscriber(), fake_download))
     assert client.post("/jobs/nope/cancel").status_code == 404

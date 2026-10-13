@@ -16,7 +16,9 @@ QUEUED, DOWNLOADING, TRANSCRIBING, EXTRACTING, DONE, ERROR = (
 )
 _FINISHED = {DONE, ERROR}
 _KEEP = 20
-# About 10 times the longest run measured (a 1 847 s video took 48 s).
+# Measured in data/runs.db: a text run of a 1 847 s video took 48 s (about 19 times margin),
+# a frames run of a 785 s video took 130 s, 98 s of it the capture (the 56 min reference video
+# extrapolates to about 510 s, a margin of about 1.8 times).
 JOB_TIMEOUT_S = 900.0
 
 
@@ -26,6 +28,10 @@ class JobBusy(Exception):
 
 class JobStopped(Exception):
     """The job was cancelled or ran past its time limit, the message is meant for the end user."""
+
+    def __init__(self, message: str, cancelled: bool = False) -> None:
+        super().__init__(message)
+        self.cancelled = cancelled
 
 
 @dataclass
@@ -44,7 +50,7 @@ class Job:
     def check(self) -> None:
         """Called at the checkpoints of every long step: stops the job when it must end."""
         if self.cancel.is_set():
-            raise JobStopped("Transcription annulée.")
+            raise JobStopped("Transcription annulée.", cancelled=True)
         if time.monotonic() - self.started > self.timeout:
             raise JobStopped(
                 f"La transcription a dépassé la limite de {round(self.timeout / 60)} minutes."
