@@ -81,13 +81,11 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 
 ## API
 
-- `POST /jobs` avec `{"url": "...", "level": "text"}` renvoie `202 {"id"}`. `level` est facultatif : `text` (défaut) ou `frames` pour capturer aussi les images. `422` si l'URL ou le niveau est invalide, `409` si un job tourne déjà.
-- `GET /jobs/{id}` renvoie `{id, stage, progress, text, segments, error}`. `stage` vaut `queued`, `downloading`, `transcribing`, `extracting` (niveau `frames` seulement), `done` ou `error`. `segments` est la liste des `{start, end, text}` du job terminé (secondes depuis le début), vide tant qu'il n'est pas `done`.
-- `GET /runs?limit=&offset=` liste les runs terminés, du plus récent au plus ancien. `limit` de 1 à 100 (20 par défaut), `offset` au moins 0, sinon `422`. Renvoie `{runs, total, limit, offset}`, chaque run étant un résumé (`id, video_id, url, title, channel, video_duration, state, level, language, word_count, started_at, total_s`).
-- `GET /runs/latest` renvoie le dernier run réussi (état `done`) en entier, `404 {"detail": "Aucun run réussi."}` s'il n'y en a aucun.
-- `GET /runs/{id}` renvoie le run complet (métadonnées, télémétrie, `text`, `segments`, `frames`, la liste des `{position, time, path, url}` des slides, vide sans capture), `404` si l'id est inconnu. `GET /runs/latest` porte aussi `url`.
-- `GET /runs/{id}/frames/{name}` renvoie l'image WebP d'un slide (`url` relative donnée par `GET /runs/{id}`). `404 {"detail": "Image inconnue."}` si le nom n'est pas une image du run ou si le fichier a disparu, `404 {"detail": "Run inconnu."}` si l'id est inconnu.
-- `GET /runs/{id}/markdown` renvoie le transcript en `text/markdown` : un titre, puis une ligne `[mm:ss] texte` par segment (`[h:mm:ss]` dès une heure).
+Le contrat est publié par l'app elle-même : `http://localhost:8000/openapi.json`, lisible dans `http://localhost:8000/docs`. Il donne chaque route, ses paramètres et le schéma de chaque réponse, succès et erreurs.
+
+- On lance un job avec `POST /jobs`, puis on interroge `GET /jobs/{id}` jusqu'à `done` ou `error`. Un seul job à la fois : le second reçoit `409`.
+- Les runs terminés se relisent par `GET /runs`, `GET /runs/latest` (le dernier run réussi), `GET /runs/{id}`, sa vue `GET /runs/{id}/markdown` et ses slides `GET /runs/{id}/frames/{name}`.
+- Les erreurs sont `{"detail": "..."}`, en français.
 
 ## Tests
 
