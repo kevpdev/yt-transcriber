@@ -1,6 +1,6 @@
 ---
 objective: "Aucun job ne garde le GPU indéfiniment : un direct en cours est refusé, un job trop long ou annulé passe en `error` et libère le verrou, et Compose n'affiche `healthy` qu'une fois le modèle chargé."
-status: pending
+status: implemented
 ---
 
 # Plan: Borner la durée d'un job, permettre l'annulation, ajouter un healthcheck

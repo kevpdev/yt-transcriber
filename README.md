@@ -104,14 +104,14 @@ Les routes, leurs paramètres et le schéma de chaque réponse sont dans `http:/
 | `POST /jobs` | `202` | sonder le job |
 | `POST /jobs` | `409` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
 | `POST /jobs` | `422` | corriger la requête, réessayer ne sert à rien |
-| `POST /jobs/{id}/cancel` | `202` | l'arrêt est demandé, continuer à sonder : le job passe en `error` avec « Transcription annulée. » |
+| `POST /jobs/{id}/cancel` | `202` | l'arrêt est demandé, continuer à sonder : le job passe en `error` avec « Transcription annulée. », sauf s'il se termine avant le prochain point de passage, auquel cas il finit `done`. L'arrêt peut tarder jusqu'à ~20 s pendant une attente réseau de yt-dlp |
 | `POST /jobs/{id}/cancel` | `404` / `409` | job inconnu (redémarrage) / déjà fini : le sondage fait foi |
 | `GET /jobs/{id}` | `404` | les jobs vivent en mémoire, un redémarrage les perd. Le run fini reste lisible par `GET /runs/{id}` |
 | `GET /runs/{id}` | `404` | id inconnu, job pas encore fini, ou écriture du run échouée |
 | `GET /runs/latest` | `404` | aucun run réussi pour l'instant |
 | `GET /runs/{id}/frames/{name}` | `404` | run inconnu, nom absent de `frames`, ou fichier effacé du disque |
 
-Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job qui dépasse 15 minutes finit en `error` avec un message qui cite la limite, et un direct en cours finit en `error` sans téléchargement. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
+Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job qui dépasse 15 minutes finit en `error` avec un message qui cite la limite (sauf pendant la capture des images : la transcription est gardée, sans images), et un direct en cours finit en `error` sans téléchargement. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
 
 ### Exemple complet
 
