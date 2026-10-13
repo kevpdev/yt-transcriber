@@ -96,7 +96,8 @@ def create_app(
                     if runs.frames_dir:
                         images = capture_images(job, url, Path(tmp), runs.frames_dir / job.id)
         except AudioError as exc:
-            log.exception("Job %s failed: %s", job.id, exc)
+            # The cause is the last line of the traceback, the header does not repeat it.
+            log.exception("Job %s failed to download", job.id)
             error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the job fails, the app keeps running
             log.exception("Job %s failed with an unexpected error", job.id)

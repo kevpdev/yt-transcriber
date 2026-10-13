@@ -133,7 +133,9 @@ def test_download_error_logs_the_job_id_and_cause_but_keeps_the_french_message(c
     assert body["error"] == "Impossible de télécharger l'audio : Video unavailable"
     failed = [r for r in caplog.records if r.levelno == logging.ERROR]
     assert len(failed) == 1 and failed[0].exc_info is not None
-    assert job_id in failed[0].getMessage() and "Video unavailable" in failed[0].getMessage()
+    # The cause is written once, by the last line of the traceback, not in the header.
+    assert job_id in failed[0].getMessage() and "Video unavailable" not in failed[0].getMessage()
+    assert "AudioError: Impossible de télécharger l'audio : Video unavailable" in caplog.text
     assert f"Job {job_id} started" in caplog.text and f"Job {job_id} finished: error" in caplog.text
 
 
@@ -142,6 +144,7 @@ def test_unexpected_error_logs_the_job_id_and_traceback_but_not_in_the_api(caplo
         def run(self, audio, on_progress):
             raise ZeroDivisionError("division by zero")
 
+    caplog.set_level(logging.INFO, logger="app")
     client = TestClient(create_app(Crashing(), fake_download))
     job_id = client.post("/jobs", json={"url": URL}).json()["id"]
     body = wait_for(client, job_id)
@@ -151,6 +154,7 @@ def test_unexpected_error_logs_the_job_id_and_traceback_but_not_in_the_api(caplo
     assert len(failed) == 1 and job_id in failed[0].getMessage()
     assert "Traceback (most recent call last)" in caplog.text
     assert "ZeroDivisionError: division by zero" in caplog.text
+    assert f"Job {job_id} started" in caplog.text and f"Job {job_id} finished: error" in caplog.text
 
 
 def test_unknown_job_is_404():
