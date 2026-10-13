@@ -52,6 +52,13 @@ class JobView(Shape):
     text: str = Field(description="Empty until the job is `done`.")
     segments: list[TimedSegment] = Field(description="Empty until the job is `done`.")
     error: str = Field(description="French message, empty unless the job is in `error`.")
+    title: str | None = Field(description="Null until the download step knows the video.")
+    channel: str | None = Field(description="Null until the download step knows the video.")
+    duration: float | None = Field(description="Seconds, null until the download step knows it.")
+
+
+class Hotwords(Shape):
+    default: str = Field(description="The hotwords used when a job sends none (`HOTWORDS`).")
 
 
 class RunSummary(Shape):

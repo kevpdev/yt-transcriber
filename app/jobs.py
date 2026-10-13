@@ -43,6 +43,10 @@ class Job:
     segments: list[Segment] = field(default_factory=list)
     error: str = ""
     frames: bool = False
+    hotwords: str = ""
+    title: str | None = None
+    channel: str | None = None
+    duration: float | None = None
     timeout: float = JOB_TIMEOUT_S
     cancel: threading.Event = field(default_factory=threading.Event)
     started: float = field(default_factory=time.monotonic)
@@ -64,6 +68,9 @@ class Job:
             "text": self.text,
             "segments": [{"start": s.start, "end": s.end, "text": s.text} for s in self.segments],
             "error": self.error,
+            "title": self.title,
+            "channel": self.channel,
+            "duration": self.duration,
         }
 
 
@@ -73,11 +80,13 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._active: Job | None = None
 
-    def start(self, frames: bool = False, timeout: float = JOB_TIMEOUT_S) -> Job:
+    def start(
+        self, frames: bool = False, timeout: float = JOB_TIMEOUT_S, hotwords: str = ""
+    ) -> Job:
         with self._lock:
             if self._active and self._active.stage not in _FINISHED:
                 raise JobBusy("Une transcription est déjà en cours, attends qu'elle se termine.")
-            job = Job(id=uuid.uuid4().hex, frames=frames, timeout=timeout)
+            job = Job(id=uuid.uuid4().hex, frames=frames, timeout=timeout, hotwords=hotwords)
             self._active = job
             self._jobs[job.id] = job
             while len(self._jobs) > _KEEP:
@@ -102,6 +111,12 @@ class JobStore:
         with self._lock:
             job.stage = stage
             job.progress = progress
+
+    def set_info(
+        self, job: Job, title: str | None, channel: str | None, duration: float | None
+    ) -> None:
+        with self._lock:
+            job.title, job.channel, job.duration = title, channel, duration
 
     def set_progress(self, job: Job, progress: float) -> None:
         job.progress = progress

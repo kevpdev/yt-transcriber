@@ -32,7 +32,16 @@ def no_check() -> None:
     pass
 
 
-def download_audio(url: str, dest_dir: Path, check: Callable[[], None] = no_check) -> Download:
+def no_info(title: str | None, channel: str | None, duration: float | None) -> None:
+    pass
+
+
+def download_audio(
+    url: str,
+    dest_dir: Path,
+    check: Callable[[], None] = no_check,
+    on_info: Callable[[str | None, str | None, float | None], None] = no_info,
+) -> Download:
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import DownloadError
 
@@ -52,6 +61,12 @@ def download_audio(url: str, dest_dir: Path, check: Callable[[], None] = no_chec
                 raise AudioError(
                     "Les directs en cours ne sont pas pris en charge : attends la fin du direct."
                 )
+            # The metadata is known here, before the audio is downloaded.
+            on_info(
+                info.get("title"),
+                info.get("channel") or info.get("uploader"),
+                info.get("duration"),
+            )
             info = ydl.process_ie_result(info, download=True)
             return Download(
                 path=Path(ydl.prepare_filename(info)),

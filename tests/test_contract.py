@@ -18,6 +18,7 @@ EXPECTED = {
     ("post", "/jobs"): {"202", "409", "422"},
     ("post", "/jobs/{job_id}/cancel"): {"202", "404", "409"},
     ("get", "/jobs/{job_id}"): {"200", "404"},
+    ("get", "/hotwords"): {"200"},
     ("get", "/runs"): {"200", "422"},
     ("get", "/runs/latest"): {"200", "404"},
     ("get", "/runs/{run_id}"): {"200", "404"},
@@ -121,6 +122,8 @@ def test_real_job_bodies_match_their_published_models():
     check(client.post("/jobs", json={"url": "nope"}), 422, c.RequestError)
     check(client.post("/jobs", json={"url": URL, "level": "video"}), 422, c.RequestError)
     check(client.post("/jobs", json={"url": 5}), 422, c.RequestError)
+    check(client.post("/jobs", json={"url": URL, "hotwords": 5}), 422, c.RequestError)
+    check(client.get("/hotwords"), 200, c.Hotwords)
 
 
 def test_real_run_bodies_match_their_published_models(tmp_path):
@@ -130,7 +133,7 @@ def test_real_run_bodies_match_their_published_models(tmp_path):
     run_id = client.post("/jobs", json={"url": URL, "level": "frames"}).json()["id"]
     assert wait_for(client, run_id)["stage"] == j.DONE
 
-    def failing(url, dest, check=None):
+    def failing(url, dest, check=None, on_info=None):
         raise AudioError("Vidéo indisponible.")
 
     failed = TestClient(create_app(FakeTranscriber(), failing, runs))

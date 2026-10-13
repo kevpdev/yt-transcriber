@@ -30,3 +30,10 @@ def test_index_route_still_serves_the_page():
     resp = make_client().get("/")
     assert resp.status_code == 200
     assert "/static/app.js" in resp.text
+
+
+def test_page_has_the_hotwords_field_the_video_line_and_the_txt_button():
+    html = make_client().get("/").text
+    assert 'id="hotwords"' in html and 'for="hotwords"' in html
+    assert 'id="video"' in html
+    assert 'id="download"' in html and 'aria-label="Télécharger en .txt"' in html

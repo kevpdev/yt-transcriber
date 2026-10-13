@@ -50,7 +50,7 @@ def test_done_run_stores_its_segments_in_order():
 
 
 def test_failed_run_stores_no_segments():
-    def failing(url, dest, check=None):
+    def failing(url, dest, check=None, on_info=None):
         raise AudioError("Video unavailable")
 
     runs = RunStore(":memory:")
@@ -161,7 +161,7 @@ def test_two_runs_migration_leaves_the_version_at_four(tmp_path):
 
 
 def test_failed_run_is_recorded_with_its_error_and_no_transcript():
-    def failing(url, dest, check=None):
+    def failing(url, dest, check=None, on_info=None):
         raise AudioError("Impossible de télécharger l'audio : Video unavailable")
 
     runs = RunStore(":memory:")
@@ -275,7 +275,7 @@ def test_latest_run_is_the_second_and_list_is_newest_first():
     assert "text" not in body["runs"][0] and "segments" not in body["runs"][0]
 
 
-def failing_download(url, dest, check=None):
+def failing_download(url, dest, check=None, on_info=None):
     raise AudioError("Impossible de télécharger l'audio : Video unavailable")
 
 
