@@ -88,26 +88,25 @@ Cette section suffit à un agent, ou au skill qui le pilote, pour transcrire une
 ### Le cycle
 
 1. **Lancer l'app** avec `docker compose up --build -d`. Le modèle se charge avant que le serveur accepte une connexion : tant que `curl` sur `/` échoue, l'app n'est pas prête. Au premier démarrage, le modèle (1,6 Go) est d'abord téléchargé. Si le conteneur s'arrête (`docker compose ps` vide), le modèle n'a pas pu se charger, ses logs disent pourquoi.
-2. **Lancer un job** avec `POST /jobs` et `{"url": "<URL YouTube>", "level": "frames"}`. `level` vaut `text` (défaut, transcription seule) ou `frames` (transcription puis capture des slides). La réponse `202 {"id": "..."}` donne l'id du job.
-3. **Sonder le job** avec `GET /jobs/{id}` toutes les 2 secondes, jusqu'à ce que `stage` vaille `done` ou `error`. Les étapes passent par `queued`, `downloading`, `transcribing` (avec `progress` de 0 à 1), puis `extracting` au niveau `frames`. En `error`, le champ `error` porte le message. Un `404` veut dire que l'app a redémarré : passer à l'étape 4.
-4. **Relire le run** avec `GET /runs/{id}`, le même id que le job. La ligne est écrite avant que le job passe à `done` ou `error`, donc elle existe dès que l'étape 3 s'arrête, y compris pour un échec (`state` vaut alors `error`). Seule exception, une écriture en base qui a échoué : elle est dans les logs du conteneur et la route répond `404`. `GET /runs/latest` renvoie le dernier run réussi, qui est le tien si tu es le seul client. `GET /runs/{id}/markdown` donne le transcript horodaté.
-5. **Télécharger les images** : chaque élément de `frames` porte `position`, `time` (secondes dans la vidéo) et `url`, une route relative à préfixer par `http://localhost:8000`. La réponse est un fichier `image/webp`.
+2. **Lancer un job** avec `POST /jobs`, le niveau `frames` pour avoir aussi les slides. La réponse `202` donne l'id du job.
+3. **Sonder le job** avec `GET /jobs/{id}` toutes les 2 secondes, jusqu'à ce que `stage` vaille `done` ou `error`. Un `404` veut dire que l'app a redémarré : passer à l'étape 4.
+4. **Relire le run** avec `GET /runs/{id}`, le même id que le job. La ligne est écrite avant que le job passe à `done` ou `error`, donc elle existe dès que l'étape 3 s'arrête, y compris pour un échec. Seule exception, une écriture en base qui a échoué : elle est dans les logs du conteneur et la route répond `404`. `GET /runs/latest` renvoie le dernier run réussi, qui est le tien si tu es le seul client.
+5. **Télécharger les images** : l'`url` de chaque élément de `frames` est une route relative, à préfixer par `http://localhost:8000`.
 6. **Arrêter l'app** avec `docker compose down`, jamais `down -v` qui efface le modèle en cache. L'historique dans `data/` survit dans les deux cas.
 
 ### Les codes à traiter
 
-Les routes et leurs champs sont décrits dans la section API ci-dessus. Ce tableau dit quoi faire de chaque réponse.
+Les routes, leurs paramètres et le schéma de chaque réponse sont dans `http://localhost:8000/docs`. Ce tableau dit seulement quoi faire de chaque code.
 
-| Appel | Code | Corps | Quoi faire |
-| --- | --- | --- | --- |
-| `POST /jobs` | `202` | `{"id"}` | sonder le job |
-| `POST /jobs` | `409` | `{"detail": "Une transcription est déjà en cours, attends qu'elle se termine."}` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
-| `POST /jobs` | `422` | `{"detail": "..."}`, une liste au lieu d'un texte si le corps n'est pas un JSON valide | URL qui n'est pas YouTube, `level` autre que `text` ou `frames`, ou corps mal formé. Corriger la requête, réessayer ne sert à rien |
-| `GET /jobs/{id}` | `404` | `{"detail": "Job inconnu."}` | les jobs vivent en mémoire, un redémarrage les perd. Le run fini reste lisible par `GET /runs/{id}` |
-| `GET /runs/{id}` | `404` | `{"detail": "Run inconnu."}` | id inconnu, job pas encore fini, ou écriture du run échouée |
-| `GET /runs/latest` | `404` | `{"detail": "Aucun run réussi."}` | aucun run en état `done` |
-| `GET /runs/{id}/frames/{name}` | `404` | `{"detail": "Run inconnu."}` | id de run inconnu |
-| `GET /runs/{id}/frames/{name}` | `404` | `{"detail": "Image inconnue."}` | nom absent de `frames` du run, ou fichier effacé du disque |
+| Appel | Code | Quoi faire |
+| --- | --- | --- |
+| `POST /jobs` | `202` | sonder le job |
+| `POST /jobs` | `409` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
+| `POST /jobs` | `422` | corriger la requête, réessayer ne sert à rien |
+| `GET /jobs/{id}` | `404` | les jobs vivent en mémoire, un redémarrage les perd. Le run fini reste lisible par `GET /runs/{id}` |
+| `GET /runs/{id}` | `404` | id inconnu, job pas encore fini, ou écriture du run échouée |
+| `GET /runs/latest` | `404` | aucun run réussi pour l'instant |
+| `GET /runs/{id}/frames/{name}` | `404` | run inconnu, nom absent de `frames`, ou fichier effacé du disque |
 
 Les messages sont en français et destinés à un humain, un agent décide sur le code HTTP. Un job en `done` au niveau `frames` peut avoir `frames` vide : la capture des images a échoué (l'erreur est dans les logs du conteneur) et la transcription est gardée.
 
