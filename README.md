@@ -18,7 +18,7 @@ Prérequis : Docker avec Compose, `nvidia-container-toolkit`, un GPU NVIDIA réc
 2. La page affiche l'étape (téléchargement, transcription, puis extraction des images avec le second bouton) et le pourcentage de la transcription. Dès que yt-dlp connaît la vidéo, une ligne montre son titre, sa chaîne et sa durée, pour vérifier que c'est la bonne avant d'attendre.
 3. Le texte arrive dans la grande zone. Le bouton aux deux feuilles superposées le copie, la flèche vers le bas le télécharge en `.txt` (le titre en première ligne, puis la vue affichée).
 
-La langue parlée est détectée automatiquement et le texte sort dans cette langue, sans traduction. Un seul job tourne à la fois, un second reçoit un message clair.
+La langue parlée est détectée automatiquement et le texte sort dans cette langue, sans traduction. Un seul job tourne à la fois, les suivants attendent leur tour dans une file.
 
 Quand un job échoue, la page affiche un message court. La cause complète est dans les journaux du conteneur, `docker compose logs yt-transcriber` : une ligne au début et à la fin de chaque job avec son identifiant, et le traceback de chaque échec. Compose en garde au plus 3 fichiers de 10 Mo, et `docker compose down` les efface.
 
@@ -77,7 +77,7 @@ Les choix et leurs mesures : [`stack.md`](aidd_docs/memory/internal/decisions/st
 
 Le contrat est publié par l'app elle-même : `http://localhost:8000/openapi.json`, lisible dans `http://localhost:8000/docs`. Il donne chaque route, ses paramètres et le schéma de chaque réponse, succès et erreurs.
 
-- On lance un job avec `POST /jobs`, puis on interroge `GET /jobs/{id}` jusqu'à `done` ou `error`. Un seul job à la fois : le second reçoit `409`. `GET /jobs/{id}` publie aussi `title`, `channel` et `duration`, à `null` tant que le téléchargement ne connaît pas la vidéo, et `GET /hotwords` donne la valeur par défaut des hotwords.
+- On lance un job avec `POST /jobs`, puis on interroge `GET /jobs/{id}` jusqu'à `done` ou `error`. Un seul job tourne à la fois : les suivants répondent `202` aussi et attendent en `queued`, dans l'ordre d'arrivée. `GET /jobs/{id}` publie aussi `title`, `channel` et `duration`, à `null` tant que le téléchargement ne connaît pas la vidéo, et `GET /hotwords` donne la valeur par défaut des hotwords.
 - Un job ne garde pas le GPU indéfiniment : il s'arrête en `error` au bout de 15 minutes, ou sur `POST /jobs/{id}/cancel` (`202` accepté, `404` inconnu, `409` déjà fini). L'arrêt est coopératif, il prend effet au prochain point de passage : quelques secondes, ou le temps du premier segment transcrit. Un direct en cours ou programmé est refusé avant tout téléchargement, un direct terminé est accepté.
 - Les runs terminés se relisent par `GET /runs`, `GET /runs/latest` (le dernier run réussi), `GET /runs/{id}`, sa vue `GET /runs/{id}/markdown` et ses slides `GET /runs/{id}/frames/{name}`.
 - Les erreurs sont `{"detail": "..."}`, en français.
@@ -102,7 +102,6 @@ Les routes, leurs paramètres et le schéma de chaque réponse sont dans `http:/
 | Appel | Code | Quoi faire |
 | --- | --- | --- |
 | `POST /jobs` | `202` | sonder le job |
-| `POST /jobs` | `409` | un seul job à la fois (un GPU). Réessayer plus tard, l'API ne donne pas l'id du job en cours |
 | `POST /jobs` | `422` | corriger la requête, réessayer ne sert à rien |
 | `POST /jobs/{id}/cancel` | `202` | l'arrêt est demandé, continuer à sonder : le job passe en `error` avec « Transcription annulée. », sauf s'il se termine avant le prochain point de passage, auquel cas il finit `done`. L'arrêt peut tarder jusqu'à ~20 s pendant une attente réseau de yt-dlp |
 | `POST /jobs/{id}/cancel` | `404` / `409` | job inconnu (redémarrage) / déjà fini : le sondage fait foi |
@@ -127,7 +126,7 @@ until curl -s -o /dev/null "$BASE/"; do
   sleep 5
 done
 
-# 2. lancer : 202 donne l'id, 409 ou 422 arrête
+# 2. lancer : 202 donne l'id, 422 arrête
 CODE=$(curl -s -o job.json -w '%{http_code}' -X POST "$BASE/jobs" \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://www.youtube.com/watch?v=KnXm3PbNz5A", "level": "frames"}')
@@ -156,7 +155,7 @@ CODE=$(curl -s -o slide.webp -w '%{http_code}' "$BASE$FRAME")
 echo "$FRAME enregistrée dans slide.webp"
 ```
 
-Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 52 s de bout en bout et code de sortie 0, run `done` en français, 3 680 mots, 49 images, la première enregistrée en WebP 1280x720. Un second lancement pendant le premier s'est arrêté sur `POST /jobs 409`.
+Joué tel quel le 13 octobre 2026 sur l'app réelle (RTX 5060 Ti, modèle en cache) : 52 s de bout en bout et code de sortie 0, run `done` en français, 3 680 mots, 49 images, la première enregistrée en WebP 1280x720. Mesure historique : à cette date, un second lancement pendant le premier s'arrêtait sur `POST /jobs 409`, avant la file d'attente (#12).
 
 ## Tests
 

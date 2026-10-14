@@ -22,10 +22,6 @@ _KEEP = 20
 JOB_TIMEOUT_S = 900.0
 
 
-class JobBusy(Exception):
-    """A job is already running, there is only one GPU."""
-
-
 class JobStopped(Exception):
     """The job was cancelled or ran past its time limit, the message is meant for the end user."""
 
@@ -50,6 +46,10 @@ class Job:
     timeout: float = JOB_TIMEOUT_S
     cancel: threading.Event = field(default_factory=threading.Event)
     started: float = field(default_factory=time.monotonic)
+
+    def begin(self) -> None:
+        """Called when the worker takes the job: the time spent in the queue is not counted."""
+        self.started = time.monotonic()
 
     def check(self) -> None:
         """Called at the checkpoints of every long step: stops the job when it must end."""
@@ -78,19 +78,19 @@ class JobStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, Job] = {}
-        self._active: Job | None = None
 
     def start(
         self, frames: bool = False, timeout: float = JOB_TIMEOUT_S, hotwords: str = ""
     ) -> Job:
         with self._lock:
-            if self._active and self._active.stage not in _FINISHED:
-                raise JobBusy("Une transcription est déjà en cours, attends qu'elle se termine.")
             job = Job(id=uuid.uuid4().hex, frames=frames, timeout=timeout, hotwords=hotwords)
-            self._active = job
             self._jobs[job.id] = job
+            # Only a finished job is evicted: a queued or running one would be lost without a trace.
             while len(self._jobs) > _KEEP:
-                self._jobs.pop(next(iter(self._jobs)))
+                oldest = next((i for i, o in self._jobs.items() if o.stage in _FINISHED), None)
+                if oldest is None:
+                    break
+                del self._jobs[oldest]
             return job
 
     def get(self, job_id: str) -> Job | None:

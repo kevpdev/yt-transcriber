@@ -1,5 +1,6 @@
 import logging
 import os
+import queue
 import re
 import shutil
 import sys
@@ -70,6 +71,7 @@ def create_app(
     store = j.JobStore()
     runs = runs or RunStore(":memory:")
     env: dict = {}
+    pending: queue.Queue[tuple[j.Job, str, str]] = queue.Queue()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -113,6 +115,8 @@ def create_app(
         error = None
         log.info("Job %s started: %s, level %s", job.id, url, "frames" if job.frames else "text")
         try:
+            # A job cancelled while it waited in the queue stops here, before any download.
+            job.check()
             store.set_stage(job, j.DOWNLOADING)
             with tempfile.TemporaryDirectory() as tmp:
                 meta = download(
@@ -188,12 +192,28 @@ def create_app(
         else:
             store.fail(job, error or "Erreur inattendue pendant la transcription.")
 
+    def consume() -> None:
+        """The single consumer: one GPU, so one job at a time, in the order of arrival.
+
+        Take the next job, restart its time limit clock so the wait is not counted, run it,
+        then go back to the queue.
+        """
+        while True:
+            job, video_id, url = pending.get()
+            job.begin()
+            try:
+                work(job, video_id, url)
+            except Exception:  # noqa: BLE001 - `work` catches everything, this keeps the loop alive
+                log.exception("Job %s crashed the worker", job.id)
+                store.fail(job, "Erreur inattendue pendant la transcription.")
+
+    threading.Thread(target=consume, daemon=True).start()
+
     @app.post(
         "/jobs",
         status_code=202,
         responses={
             202: {"model": c.JobCreated, "description": "Job queued, poll it with its id."},
-            409: c.error("A job is already running."),
             422: c.error("Invalid YouTube URL, level or hotwords.", c.RequestError),
         },
     )
@@ -217,13 +237,8 @@ def create_app(
                 status_code=422,
             )
         words = (words or "").strip() or hotwords()
-        try:
-            job = store.start(frames=level == "frames", timeout=timeout, hotwords=words)
-        except j.JobBusy as exc:
-            return JSONResponse({"detail": str(exc)}, status_code=409)
-        threading.Thread(
-            target=work, args=(job, video_id, canonical_url(video_id)), daemon=True
-        ).start()
+        job = store.start(frames=level == "frames", timeout=timeout, hotwords=words)
+        pending.put((job, video_id, canonical_url(video_id)))
         return {"id": job.id}
 
     @app.post(
