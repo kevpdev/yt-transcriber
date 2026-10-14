@@ -26,7 +26,7 @@ La machine cible est une RTX 5060 Ti de 16 Go, en compute capability 12.0 (Black
 | Exposition du GPU | Docker, un seul service Compose, avec la réservation `deploy.resources.reservations.devices` (`driver: nvidia`, `count: all`, `capabilities: [gpu]`) | en natif : il faudrait `sudo apt install python3.12-venv`, absent de la machine |
 | Image | `python:3.12-slim`, plus les paquets pip `nvidia-cublas-cu12` et `nvidia-cudnn-cu12==9.*` | `nvidia/cuda` : plus lourde, et non mesurée |
 | Lancement | `docker compose up --build`, page sur `localhost:8000`, volume nommé pour `HF_HOME` (le modèle pèse 1,6 Go, téléchargé au premier démarrage) | `docker build` puis `docker run --gpus all …` : deux commandes |
-| Attente côté UI | `POST /jobs` renvoie un identifiant tout de suite. La page interroge `GET /jobs/{id}` toutes les 2 s, qui renvoie l'étape (téléchargement, transcription), le pourcentage (`segment.end / info.duration`) et le texte final. Un seul job à la fois, puisqu'il n'y a qu'un GPU. Un second job reçoit un message clair | une requête synchrone qui dure plusieurs minutes, exposée aux timeouts |
+| Attente côté UI | `POST /jobs` renvoie un identifiant tout de suite. La page interroge `GET /jobs/{id}` toutes les 2 s, qui renvoie l'étape (téléchargement, transcription), le pourcentage (`segment.end / info.duration`) et le texte final. Un seul job à la fois, puisqu'il n'y a qu'un GPU. Les jobs suivants attendent dans une file, voir `job-queue.md` | une requête synchrone qui dure plusieurs minutes, exposée aux timeouts |
 
 ## Pièges mesurés, à respecter
 

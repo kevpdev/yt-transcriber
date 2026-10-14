@@ -57,6 +57,7 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 <!-- read on demand, not auto-loaded -->
 - aidd_docs/memory/internal/decisions/frames-pyav.md
 - aidd_docs/memory/internal/decisions/generation-outside-app.md
+- aidd_docs/memory/internal/decisions/job-queue.md
 - aidd_docs/memory/internal/decisions/lockfile.md
 - aidd_docs/memory/internal/decisions/openapi-contract.md
 - aidd_docs/memory/internal/decisions/page-files.md
