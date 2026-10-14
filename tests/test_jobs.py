@@ -125,15 +125,20 @@ def test_invalid_url_gives_422_and_app_keeps_running():
 
 
 def test_second_job_waits_in_the_queue_and_runs_after_the_first():
-    gate = threading.Event()
+    gates = [threading.Event(), threading.Event()]
     other = "https://www.youtube.com/watch?v=KnXm3PbNz5A"
     downloaded: list[str] = []
+
+    class GatedTranscriber(FakeTranscriber):
+        def run(self, audio, on_progress, hotwords=""):
+            self.gate = gates[len(downloaded) - 1]
+            return super().run(audio, on_progress, hotwords)
 
     def logging_download(url, dest, check=None, on_info=None):
         downloaded.append(url)
         return fake_download(url, dest, check, on_info)
 
-    client = TestClient(create_app(FakeTranscriber(gate), logging_download))
+    client = TestClient(create_app(GatedTranscriber(), logging_download))
     first = client.post("/jobs", json={"url": URL}).json()["id"]
     wait_for(client, first, stages=(j.TRANSCRIBING,))
     resp = client.post("/jobs", json={"url": other})
@@ -141,8 +146,10 @@ def test_second_job_waits_in_the_queue_and_runs_after_the_first():
     second = resp.json()["id"]
     assert client.get(f"/jobs/{second}").json()["stage"] == j.QUEUED
     assert len(downloaded) == 1
-    gate.set()
+    gates[0].set()
     assert wait_for(client, first)["stage"] == j.DONE
+    assert wait_for(client, second, stages=(j.TRANSCRIBING,))["stage"] == j.TRANSCRIBING
+    gates[1].set()
     assert wait_for(client, second)["stage"] == j.DONE
     assert [u.split("=")[1] for u in downloaded] == ["gsxiFd8AZQU", "KnXm3PbNz5A"]
 
@@ -427,7 +434,10 @@ def test_job_past_its_time_limit_ends_in_error_and_the_next_job_runs():
     body = wait_for(client, job_id)
     assert body["stage"] == j.ERROR and "limite" in body["error"]
     assert client.get(f"/runs/{job_id}").json()["state"] == "error"
-    assert client.post("/jobs", json={"url": URL}).status_code == 202
+    next_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(client, next_id, stages=(j.TRANSCRIBING,))
+    client.post(f"/jobs/{next_id}/cancel")
+    assert wait_for(client, next_id)["error"] == "Transcription annulée."
 
 
 def test_cancel_during_transcription_ends_in_error_and_the_next_job_runs():
@@ -439,7 +449,10 @@ def test_cancel_during_transcription_ends_in_error_and_the_next_job_runs():
     body = wait_for(client, job_id)
     assert body["stage"] == j.ERROR and body["error"] == "Transcription annulée."
     assert client.get(f"/runs/{job_id}").json()["state"] == "error"
-    assert client.post("/jobs", json={"url": URL}).status_code == 202
+    next_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    wait_for(client, next_id, stages=(j.TRANSCRIBING,))
+    client.post(f"/jobs/{next_id}/cancel")
+    assert wait_for(client, next_id)["error"] == "Transcription annulée."
 
 
 def test_cancel_during_download_stops_the_job_before_transcription():

@@ -201,6 +201,7 @@ def create_app(
                 work(job, video_id, url)
             except Exception:  # noqa: BLE001 - `work` catches everything, this keeps the loop alive
                 log.exception("Job %s crashed the worker", job.id)
+                store.fail(job, "Erreur inattendue pendant la transcription.")
 
     threading.Thread(target=consume, daemon=True).start()
 
