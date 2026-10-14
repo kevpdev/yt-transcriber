@@ -12,32 +12,53 @@ The macro technical shape: the stack, how the pieces fit, and the decisions behi
 
 ## How it fits together
 
-Two threads share the work. The HTTP thread only queues a job and answers `202`. The single worker thread takes the jobs one by one, in their order of arrival, and goes back to the queue once a job ends. The caller polls the state on its own, without waiting on the worker.
+Two threads share one in-memory `Job` per request. The HTTP thread creates it and queues it, the single worker thread runs it, and the caller reads it. The same `Job` object sits in the queue and in `JobStore`, so what the worker writes is what the caller reads.
 
 ```mermaid
 flowchart TD
     caller["Browser page or agent"]
     subgraph http["HTTP thread"]
-        post["POST /jobs, answers 202"]
+        post["POST /jobs"]
     end
-    store["JobStore in memory"]
+    store["JobStore<br/>one line per job"]
     queue["FIFO queue"]
     subgraph worker["Worker thread, one only"]
         take["Take the next job"]
-        run["Download, transcribe, capture frames if asked"]
+        run["Run its stages"]
     end
     runs["RunStore in SQLite"]
 
-    caller --> post
-    caller -.->|"polls GET /jobs/id"| store
-    post -->|"job queued"| store
-    post -->|"enqueue"| queue
-    queue --> take
-    take --> run
-    run -->|"stage and progress"| store
-    run -->|"finished run"| runs
-    run -.->|"next job"| take
+    caller -->|"1"| post
+    post -->|"2"| store
+    post -->|"3"| queue
+    queue -->|"4"| take
+    take -->|"5"| run
+    run -->|"6"| store
+    caller -.->|"7"| store
+    caller -.->|"8"| store
+    run -->|"9"| runs
+    run -.->|"10"| take
+
+    classDef thread fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
+    classDef memory fill:#FEF3C7,stroke:#D97706,color:#78350F
+    classDef durable fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    class post,take,run thread
+    class store,queue memory
+    class runs durable
 ```
+
+Blue boxes run code, amber boxes are memory shared by both threads, green is the only storage that survives a restart.
+
+1. The caller sends `POST /jobs` and gets `202` with the job id at once.
+2. The HTTP thread creates the `Job` in `JobStore`, in the stage `queued`.
+3. It puts the same `Job` at the end of the FIFO queue.
+4. The worker takes the oldest job of the queue and restarts its time limit clock, so the wait is not counted.
+5. It runs the stages: `downloading`, `transcribing`, then `extracting` when frames are asked.
+6. At each stage it writes the stage, the progress and finally the text on the `Job` in `JobStore`. Nothing is copied, the caller sees the same object change.
+7. The caller polls `GET /jobs/{id}` every 2 s, which reads `JobStore` and never touches the queue or the worker.
+8. `POST /jobs/{id}/cancel` raises a flag on the `Job`. The worker reads it at its next checkpoint and ends the job in `error`.
+9. Once the job ends, the worker writes the run to SQLite, then marks the `Job` `done` or `error`.
+10. The worker goes back to the queue for the next job, or waits there while it is empty.
 
 ## Key decisions
 
