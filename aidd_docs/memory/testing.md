@@ -18,7 +18,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 - Tests live in `tests/`, one file per module under test (`test_jobs.py`, `test_urls.py`, `test_runs.py`).
 - `tests/test_contract.py` guards `/openapi.json`: no route publishes an empty response schema, each route declares the codes of its `EXPECTED` table, and the real bodies validate against the models of `app/contract.py`.
 - `create_app` takes a `RunStore`, `RunStore(":memory:")` by default, so tests never write a file.
-- Names read as behavior, for example `test_second_job_while_running_gives_409_then_frees`.
+- Names read as behavior, for example `test_second_job_waits_in_the_queue_and_runs_after_the_first`.
 - Jobs run in a thread, so tests poll with a `wait_for` helper instead of sleeping a fixed time.
 
 ## Run

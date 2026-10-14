@@ -26,7 +26,7 @@ What this project is, the problem it solves, and its domain language. The non-de
 - Spoken language detected automatically, text returned in that language, never translated.
 - A button switches the transcript between plain text and one `[mm:ss] text` line per segment.
 - Progress shown per stage, with a percentage while transcribing.
-- One job at a time, a second request gets a clear message.
+- One job at a time, the next requests wait their turn in a queue.
 - A page reload resumes the running job.
 - The video (title, channel, duration) is shown as soon as yt-dlp knows it, before the audio download ends.
 - The text downloads as a `.txt` file, title first, in one click.
