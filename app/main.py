@@ -193,7 +193,11 @@ def create_app(
             store.fail(job, error or "Erreur inattendue pendant la transcription.")
 
     def consume() -> None:
-        # The single consumer: one GPU, so one job at a time, in the order of arrival.
+        """The single consumer: one GPU, so one job at a time, in the order of arrival.
+
+        Take the next job, restart its time limit clock so the wait is not counted, run it,
+        then go back to the queue.
+        """
         while True:
             job, video_id, url = pending.get()
             job.begin()

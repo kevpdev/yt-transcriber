@@ -12,16 +12,31 @@ The macro technical shape: the stack, how the pieces fit, and the decisions behi
 
 ## How it fits together
 
+Two threads share the work. The HTTP thread only queues a job and answers `202`. The single worker thread takes the jobs one by one, in their order of arrival, and goes back to the queue once a job ends. The caller polls the state on its own, without waiting on the worker.
+
 ```mermaid
 flowchart TD
-    page["Browser page"] -->|"POST /jobs, then poll GET /jobs/id"| api["FastAPI app"]
-    api --> store["JobStore in memory"]
-    api --> runs["RunStore in SQLite"]
-    api --> queue["FIFO queue"]
-    queue --> worker["worker thread"]
-    worker --> audio["yt-dlp download"]
-    audio --> whisper["faster-whisper on GPU"]
-    whisper --> capture["frame capture, optional"]
+    caller["Browser page or agent"]
+    subgraph http["HTTP thread"]
+        post["POST /jobs, answers 202"]
+    end
+    store["JobStore in memory"]
+    queue["FIFO queue"]
+    subgraph worker["Worker thread, one only"]
+        take["Take the next job"]
+        run["Download, transcribe, capture frames if asked"]
+    end
+    runs["RunStore in SQLite"]
+
+    caller --> post
+    caller -.->|"polls GET /jobs/id"| store
+    post -->|"job queued"| store
+    post -->|"enqueue"| queue
+    queue --> take
+    take --> run
+    run -->|"stage and progress"| store
+    run -->|"finished run"| runs
+    run -.->|"next job"| take
 ```
 
 ## Key decisions
