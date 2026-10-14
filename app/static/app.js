@@ -70,9 +70,11 @@ function remember(id) { try { id ? localStorage.setItem(KEY, id) : localStorage.
 function remembered() { try { return localStorage.getItem(KEY); } catch { return null; } }
 
 function stop(message) {
+  const mine = current;
   current = null;
   cancelling = false;
-  remember(null);
+  // Another tab may have queued its own job under the same key: only clear our own id.
+  if (remembered() === mine) remember(null);
   if (message) showError(message);
   setBusy(false);
 }
