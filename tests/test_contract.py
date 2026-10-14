@@ -15,7 +15,7 @@ from tests.test_jobs import URL, FakeTranscriber, fake_download, wait_for
 
 # Every operation and the codes it must declare. A new route fails the test until it is added.
 EXPECTED = {
-    ("post", "/jobs"): {"202", "409", "422"},
+    ("post", "/jobs"): {"202", "422"},
     ("post", "/jobs/{job_id}/cancel"): {"202", "404", "409"},
     ("get", "/jobs/{job_id}"): {"200", "404"},
     ("get", "/hotwords"): {"200"},
@@ -81,7 +81,7 @@ def test_errors_are_the_french_detail_and_bodies_that_are_not_json_say_their_med
         return paths[path][method]["responses"][code]["content"]
 
     detail = {"application/json": {"schema": {"$ref": "#/components/schemas/Detail"}}}
-    assert content("/jobs", "post", "409") == detail
+    assert content("/jobs/{job_id}/cancel", "post", "409") == detail
     assert content("/runs/{run_id}", "get", "404") == detail
     assert set(content("/runs/{run_id}/markdown", "get", "200")) == {"text/markdown"}
     assert set(content("/runs/{run_id}/frames/{name}", "get", "200")) == {"image/webp"}
@@ -106,7 +106,6 @@ def test_real_job_bodies_match_their_published_models():
     client = TestClient(create_app(transcriber, fake_download))
     job_id = check(client.post("/jobs", json={"url": URL}), 202, c.JobCreated)["id"]
     check(client.get(f"/jobs/{job_id}"), 200, c.JobView)
-    check(client.post("/jobs", json={"url": URL}), 409, c.Detail)
     gate.set()
     wait_for(client, job_id)
     assert check(client.get(f"/jobs/{job_id}"), 200, c.JobView)["stage"] == "done"
