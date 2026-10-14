@@ -44,6 +44,6 @@ L'app a deux portes : la page pour l'humain, l'API HTTP pour l'agent, documenté
 
 - L'app n'ajoute aucune dépendance de génération et reste utilisable seule.
 - Les modes résumé ne partent pas d'un bouton de la page, mais d'une session d'agent.
-- L'utilisateur et un agent partagent le même job unique, donc le refus `409` sera plus fréquent, ce qui donne du poids à la file de #12.
+- L'utilisateur et un agent partagent le même job unique, donc le refus `409` sera plus fréquent, ce qui donne du poids à la file de #12 (résolu : la file existe, `job-queue.md` remplace le `409`).
 - Le contrat d'API devient une interface publique : un changement de forme casse les skills du vault.
 - La réécriture de `capture-video`, le skill de génération et le rangement du document dans le vault se décident côté vault.

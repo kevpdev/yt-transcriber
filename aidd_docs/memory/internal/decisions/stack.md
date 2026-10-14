@@ -4,6 +4,7 @@
 - Status: Accepted
 - Superseded by (partiel): `aidd_docs/memory/internal/decisions/lockfile.md`, ligne « Audio » (`yt-dlp` non figé)
 - Superseded by (partiel), 2026-10-12: issue #48, la transcription est aussi rendue horodatée, la mention « sans horodatage » du contexte ne vaut plus
+- Superseded by (partiel), 2026-10-14: `job-queue.md`, ligne « Attente côté UI » (le second job recevait un message clair)
 
 ## Contexte
 
