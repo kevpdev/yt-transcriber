@@ -21,4 +21,6 @@ The visual language: the design system, tokens, and UI conventions. What it look
 - The error line has `role="alert"`, the copy icon button has an `aria-label`.
 - The theme button has a stable `aria-label` ("Thème sombre") and an `aria-pressed` that is true in dark.
 - The timestamps button has a stable `aria-label` ("Afficher l'horodatage") and an `aria-pressed` that is true while the timed view is shown.
+- The download button (`#download`) has a stable `aria-label` ("Télécharger en .txt"), same classes as the copy button, between the timestamps and copy buttons. It downloads the displayed view with the title as first line, and does nothing without text.
+- The `#video` line (title, channel, duration) under the error line uses the `muted` token, no new color.
 - The UI text is in French.

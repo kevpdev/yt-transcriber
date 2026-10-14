@@ -21,8 +21,10 @@ class FakeTranscriber:
 
     def __init__(self, gate=None):
         self.gate = gate
+        self.hotwords_seen: list[str] = []
 
-    def run(self, audio, on_progress):
+    def run(self, audio, on_progress, hotwords=""):
+        self.hotwords_seen.append(hotwords)
         on_progress(0.5)
         if self.gate:
             self.gate.wait(5)
@@ -34,7 +36,9 @@ class FakeTranscriber:
         )
 
 
-def fake_download(url, dest, check=None):
+def fake_download(url, dest, check=None, on_info=None):
+    if on_info:
+        on_info("T", "C", 12.0)
     return Download(path=dest / "a.webm", title="T", channel="C", duration=12.0)
 
 
@@ -114,7 +118,7 @@ def test_second_job_while_running_gives_409_then_frees():
 
 
 def test_download_error_becomes_readable_job_error():
-    def failing(url, dest, check=None):
+    def failing(url, dest, check=None, on_info=None):
         raise AudioError("Impossible de télécharger l'audio : Video unavailable")
 
     client = TestClient(create_app(FakeTranscriber(), failing))
@@ -123,7 +127,7 @@ def test_download_error_becomes_readable_job_error():
 
 
 def test_download_error_logs_the_job_id_and_cause_but_keeps_the_french_message(caplog):
-    def failing(url, dest, check=None):
+    def failing(url, dest, check=None, on_info=None):
         raise AudioError("Impossible de télécharger l'audio : Video unavailable")
 
     caplog.set_level(logging.INFO, logger="app")
@@ -141,7 +145,7 @@ def test_download_error_logs_the_job_id_and_cause_but_keeps_the_french_message(c
 
 def test_unexpected_error_logs_the_job_id_and_traceback_but_not_in_the_api(caplog):
     class Crashing(FakeTranscriber):
-        def run(self, audio, on_progress):
+        def run(self, audio, on_progress, hotwords=""):
             raise ZeroDivisionError("division by zero")
 
     caplog.set_level(logging.INFO, logger="app")
@@ -155,6 +159,69 @@ def test_unexpected_error_logs_the_job_id_and_traceback_but_not_in_the_api(caplo
     assert "Traceback (most recent call last)" in caplog.text
     assert "ZeroDivisionError: division by zero" in caplog.text
     assert f"Job {job_id} started" in caplog.text and f"Job {job_id} finished: error" in caplog.text
+
+
+def test_job_publishes_the_video_info_while_downloading_and_keeps_it_when_done():
+    gate = threading.Event()
+
+    def waiting_download(url, dest, check=None, on_info=lambda *info: None):
+        on_info("Titre", "Chaîne", 61.0)
+        gate.wait(5)
+        return Download(path=dest / "a.webm", title="Titre", channel="Chaîne", duration=61.0)
+
+    client = TestClient(create_app(FakeTranscriber(), waiting_download))
+    job_id = client.post("/jobs", json={"url": URL}).json()["id"]
+    body: dict = {}
+    for _ in range(100):
+        body = client.get(f"/jobs/{job_id}").json()
+        if body["title"]:
+            break
+        time.sleep(0.02)
+    assert body["stage"] == j.DOWNLOADING
+    assert (body["title"], body["channel"], body["duration"]) == ("Titre", "Chaîne", 61.0)
+    gate.set()
+    done = wait_for(client, job_id)
+    assert (done["title"], done["channel"], done["duration"]) == ("Titre", "Chaîne", 61.0)
+
+
+def test_info_stays_null_when_the_download_fails_before_knowing_the_video():
+    def failing(url, dest, check=None, on_info=None):
+        raise AudioError("Vidéo indisponible.")
+
+    client = TestClient(create_app(FakeTranscriber(), failing))
+    body = wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
+    assert body["stage"] == j.ERROR
+    assert (body["title"], body["channel"], body["duration"]) == (None, None, None)
+
+
+def test_job_hotwords_reach_the_transcriber_and_the_run_settings(monkeypatch):
+    monkeypatch.setenv("HOTWORDS", "Env words")
+    transcriber = FakeTranscriber()
+    runs = RunStore(":memory:")
+    client = TestClient(create_app(transcriber, fake_download, runs))
+    sent = [{"hotwords": " Spring Boot "}, {}, {"hotwords": None}, {"hotwords": "   "}]
+    for extra in sent:
+        job_id = client.post("/jobs", json={"url": URL, **extra}).json()["id"]
+        wait_for(client, job_id)
+        used = transcriber.hotwords_seen[-1]
+        assert client.get(f"/runs/{job_id}").json()["settings"]["hotwords"] == used
+    assert transcriber.hotwords_seen == ["Spring Boot", "Env words", "Env words", "Env words"]
+
+
+@pytest.mark.parametrize("bad", [42, ["a"], "x" * 501])
+def test_invalid_hotwords_get_a_french_422(bad):
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    resp = client.post("/jobs", json={"url": URL, "hotwords": bad})
+    assert resp.status_code == 422 and "hotwords" in resp.json()["detail"]
+    assert client.post("/jobs", json={"url": URL}).status_code == 202
+
+
+def test_get_hotwords_returns_the_default_read_at_call_time(monkeypatch):
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    monkeypatch.setenv("HOTWORDS", "Alpha, Beta")
+    assert client.get("/hotwords").json() == {"default": "Alpha, Beta"}
+    monkeypatch.delenv("HOTWORDS")
+    assert client.get("/hotwords").json() == {"default": "Claude Code, Claude, Anthropic, MCP"}
 
 
 def test_unknown_job_is_404():
@@ -275,7 +342,7 @@ def test_runs_list_carries_the_level_of_each_run():
 class SlowTranscriber(FakeTranscriber):
     """Reports progress until it is stopped, like the real one does for every segment."""
 
-    def run(self, audio, on_progress):
+    def run(self, audio, on_progress, hotwords=""):
         for _ in range(500):
             time.sleep(0.01)
             on_progress(0.1)
@@ -306,7 +373,7 @@ def test_cancel_during_transcription_ends_in_error_and_frees_the_lock():
 def test_cancel_during_download_stops_the_job_before_transcription():
     started = threading.Event()
 
-    def slow_download(url, dest, check):
+    def slow_download(url, dest, check, on_info):
         started.set()
         for _ in range(500):
             time.sleep(0.01)

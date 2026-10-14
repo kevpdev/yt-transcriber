@@ -57,6 +57,21 @@ def test_a_finished_or_regular_video_is_downloaded(ydl, tmp_path: Path, status):
     assert ydl.downloaded == ["abc"]
 
 
+def test_on_info_gets_title_channel_and_duration_before_the_download(ydl, tmp_path: Path):
+    ydl.info = {"id": "abc", "title": "T", "uploader": "U", "duration": 12.0}
+    seen = []
+    download_audio("u", tmp_path, on_info=lambda *info: seen.append((info, list(ydl.downloaded))))
+    assert seen == [(("T", "U", 12.0), [])]
+
+
+def test_on_info_is_never_called_for_a_live_in_progress(ydl, tmp_path: Path):
+    ydl.info = {"id": "abc", "live_status": "is_live", "title": "T"}
+    seen = []
+    with pytest.raises(AudioError):
+        download_audio("u", tmp_path, on_info=lambda *info: seen.append(info))
+    assert seen == []
+
+
 def test_the_progress_hook_calls_check_and_its_exception_leaves_download_audio(ydl, tmp_path):
     ydl.info = {"id": "abc"}
 

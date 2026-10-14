@@ -23,7 +23,7 @@ from .fake import FakeTranscriber, fake_capture, fake_download
 from .frames import capture_frames
 from .machine import read_machine, read_versions
 from .runs import Frame, RunStore, to_markdown
-from .transcribe import Transcriber, settings
+from .transcribe import Transcriber, hotwords, settings
 from .urls import InvalidUrl, canonical_url, parse_video_id
 
 STATIC = Path(__file__).parent / "static"
@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 
 
 LEVELS = ("text", "frames")
+MAX_HOTWORDS = 500
 
 
 def with_frame_urls(run: dict) -> dict:
@@ -48,6 +49,13 @@ class JobRequest(BaseModel):
         None,
         description="`frames` also captures the slides. Missing or null means `text`.",
         json_schema_extra={"enum": [*LEVELS, None], "default": "text"},
+    )
+    # Any type, checked by `create_job` like `level`, published as a nullable string.
+    hotwords: Any = Field(
+        None,
+        description=f"Words Whisper must spell right, at most {MAX_HOTWORDS} characters. "
+        "Missing, null or blank means the `HOTWORDS` default, see `GET /hotwords`.",
+        json_schema_extra={"type": ["string", "null"], "maxLength": MAX_HOTWORDS, "default": None},
     )
 
 
@@ -107,11 +115,16 @@ def create_app(
         try:
             store.set_stage(job, j.DOWNLOADING)
             with tempfile.TemporaryDirectory() as tmp:
-                meta = download(url, Path(tmp), job.check)
+                meta = download(
+                    url,
+                    Path(tmp),
+                    job.check,
+                    lambda title, channel, duration: store.set_info(job, title, channel, duration),
+                )
                 t_download = time.monotonic() - t0
                 job.check()
                 store.set_stage(job, j.TRANSCRIBING)
-                result = transcriber.run(meta.path, lambda p: progress(job, p))
+                result = transcriber.run(meta.path, lambda p: progress(job, p), job.hotwords)
                 t_transcribe = time.monotonic() - t0 - t_download
                 if job.frames:
                     store.set_stage(job, j.EXTRACTING)
@@ -153,7 +166,7 @@ def create_app(
                 speed_ratio=meta.duration / t_transcribe
                 if meta and meta.duration and t_transcribe
                 else None,
-                settings=settings(),
+                settings=settings(job.hotwords),
                 machine=env.get("machine", {}),
                 versions=env.get("versions", {}),
                 segments=result.segments if done and result else (),
@@ -181,7 +194,7 @@ def create_app(
         responses={
             202: {"model": c.JobCreated, "description": "Job queued, poll it with its id."},
             409: c.error("A job is already running."),
-            422: c.error("Invalid YouTube URL or unknown level.", c.RequestError),
+            422: c.error("Invalid YouTube URL, level or hotwords.", c.RequestError),
         },
     )
     def create_job(req: JobRequest):
@@ -194,8 +207,18 @@ def create_app(
             return JSONResponse(
                 {"detail": f"Le niveau doit être {' ou '.join(LEVELS)}."}, status_code=422
             )
+        words = req.hotwords
+        if words is not None and (not isinstance(words, str) or len(words) > MAX_HOTWORDS):
+            return JSONResponse(
+                {
+                    "detail": "Les hotwords doivent être un texte "
+                    f"de {MAX_HOTWORDS} caractères au plus."
+                },
+                status_code=422,
+            )
+        words = (words or "").strip() or hotwords()
         try:
-            job = store.start(frames=level == "frames", timeout=timeout)
+            job = store.start(frames=level == "frames", timeout=timeout, hotwords=words)
         except j.JobBusy as exc:
             return JSONResponse({"detail": str(exc)}, status_code=409)
         threading.Thread(
@@ -229,6 +252,10 @@ def create_app(
         if job is None:
             return JSONResponse({"detail": "Job inconnu."}, status_code=404)
         return job.view()
+
+    @app.get("/hotwords", responses={200: {"model": c.Hotwords}})
+    def get_hotwords():
+        return {"default": hotwords()}
 
     def int_param(request: Request, name: str, default: int, low: int, high: int | None) -> int:
         raw = request.query_params.get(name)

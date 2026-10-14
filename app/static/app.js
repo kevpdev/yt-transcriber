@@ -23,6 +23,7 @@ let timer = null;
 let finished = null;
 let current = null;
 let cancelling = false;
+let jobUrl = "";
 
 function formatTime(seconds) {
   const total = Math.floor(seconds);
@@ -47,6 +48,14 @@ function setBusy(busy) {
   $("go-frames").disabled = busy;
   $("cancel").hidden = !busy;
   $("cancel").disabled = false;
+}
+function showVideo(job) {
+  if (!job || !job.title) {
+    $("video").textContent = "";
+    return;
+  }
+  const parts = [job.title, job.channel, job.duration != null ? formatTime(job.duration) : null];
+  $("video").textContent = parts.filter(Boolean).join(" · ");
 }
 function showError(msg) { $("error").textContent = msg || ""; }
 
@@ -89,6 +98,7 @@ async function poll(id, failures = 0) {
     return;
   }
   showError("");
+  showVideo(job);
   if (job.stage === "done") {
     finished = job;
     render();
@@ -113,12 +123,14 @@ $("form").addEventListener("submit", async (ev) => {
   finished = null;
   cancelling = false;
   $("out").value = "";
+  showVideo(null);
+  jobUrl = $("url").value;
   setBusy(true);
   try {
     const resp = await fetch("/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: $("url").value, level }),
+      body: JSON.stringify({ url: jobUrl, level }),
     });
     if (!resp.ok) {
       showError(await readError(resp));
@@ -164,6 +176,24 @@ $("timestamps").addEventListener("click", () => {
   const pressed = $("timestamps").getAttribute("aria-pressed") === "true";
   $("timestamps").setAttribute("aria-pressed", String(!pressed));
   render();
+});
+
+function fileName(title) {
+  const clean = (title || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim();
+  return (clean || "transcription") + ".txt";
+}
+
+$("download").addEventListener("click", () => {
+  const text = $("out").value;
+  if (!text) return;
+  const title = finished?.title || jobUrl;
+  const blob = new Blob([title ? `${title}\n${text}` : text], { type: "text/plain;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName(finished?.title);
+  link.click();
+  // Revoked on the next tick: some browsers read the blob after click() returns.
+  setTimeout(() => URL.revokeObjectURL(link.href), 0);
 });
 
 $("copy").addEventListener("click", async () => {

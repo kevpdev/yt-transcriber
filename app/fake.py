@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .audio import Download, no_check
+from .audio import Download, no_check, no_info
 from .frames import write_webp
 from .runs import Frame
 from .transcribe import Segment, Transcript
@@ -16,6 +16,8 @@ FAKE_TEXT = (
     "Elle sert aux tests de bout en bout de la page, sans GPU. "
     "Le texte est assez long pour vérifier la copie en entier."
 )
+FAKE_TITLE = "Vidéo factice"
+FAKE_CHANNEL = "Chaîne factice"
 # Long enough to reload the page and cut the network during the job.
 FAKE_DURATION = 10.0
 # Long enough for the page, which polls every 2 s, to show the extracting stage.
@@ -24,13 +26,17 @@ _STEPS = 10
 _SENTENCES = FAKE_TEXT.split(". ")
 
 
-def fake_download(url: str, dest_dir: Path, check: Callable[[], None] = no_check) -> Download:
+def fake_download(
+    url: str,
+    dest_dir: Path,
+    check: Callable[[], None] = no_check,
+    on_info: Callable[[str | None, str | None, float | None], None] = no_info,
+) -> Download:
     check()
+    on_info(FAKE_TITLE, FAKE_CHANNEL, FAKE_DURATION)
     path = dest_dir / "audio.webm"
     path.touch()
-    return Download(
-        path=path, title="Vidéo factice", channel="Chaîne factice", duration=FAKE_DURATION
-    )
+    return Download(path=path, title=FAKE_TITLE, channel=FAKE_CHANNEL, duration=FAKE_DURATION)
 
 
 def fake_segments() -> list[Segment]:
@@ -65,7 +71,9 @@ def fake_capture(
 class FakeTranscriber:
     model = object()  # not None: the lifespan does not call load()
 
-    def run(self, audio: Path, on_progress: Callable[[float], None]) -> Transcript:
+    def run(
+        self, audio: Path, on_progress: Callable[[float], None], hotwords: str = ""
+    ) -> Transcript:
         for step in range(1, _STEPS + 1):
             time.sleep(FAKE_DURATION / _STEPS)
             on_progress(step / _STEPS)

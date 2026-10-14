@@ -15,14 +15,14 @@ def hotwords() -> str:
     return os.environ.get("HOTWORDS", DEFAULT_HOTWORDS)
 
 
-def settings() -> dict:
+def settings(used_hotwords: str | None = None) -> dict:
     return {
         "model": MODEL,
         "compute_type": COMPUTE_TYPE,
         "beam_size": BEAM_SIZE,
         "vad_filter": VAD_FILTER,
         "condition_on_previous_text": CONDITION_ON_PREVIOUS_TEXT,
-        "hotwords": hotwords(),
+        "hotwords": hotwords() if used_hotwords is None else used_hotwords,
     }
 
 
@@ -50,7 +50,7 @@ class Transcriber:
 
         self.model = WhisperModel(MODEL, device="cuda", compute_type=COMPUTE_TYPE)
 
-    def run(self, audio: Path, on_progress: Callable[[float], None]) -> Transcript:
+    def run(self, audio: Path, on_progress: Callable[[float], None], hotwords: str) -> Transcript:
         if self.model is None:
             raise RuntimeError("The model is not loaded, call load() first.")
         segments, info = self.model.transcribe(
@@ -59,7 +59,7 @@ class Transcriber:
             beam_size=BEAM_SIZE,
             vad_filter=VAD_FILTER,
             condition_on_previous_text=CONDITION_ON_PREVIOUS_TEXT,
-            hotwords=hotwords(),
+            hotwords=hotwords,
         )
         kept = []
         progress = 0.0
