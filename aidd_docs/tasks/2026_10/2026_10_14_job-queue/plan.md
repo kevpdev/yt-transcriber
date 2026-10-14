@@ -1,6 +1,6 @@
 ---
 objective: "Deux URL envoyées à la suite sont traitées l'une après l'autre, la seconde reçoit 202 et attend en `queued` au lieu d'un 409."
-status: pending
+status: reviewed
 ---
 
 <!-- Fill or omit these sections; never add, rename, or reorder one. -->

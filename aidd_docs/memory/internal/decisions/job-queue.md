@@ -20,7 +20,7 @@ Il n'y a qu'un GPU, donc un seul job tourne à la fois. Jusqu'ici, un second `PO
 - Un job annulé pendant qu'il attend finit en `error` « Transcription annulée. », avec sa ligne `runs`, sans téléchargement : `work` appelle `job.check()` avant l'étape `downloading`.
 - L'éviction des 20 jobs gardés en mémoire ne retire que des jobs finis, parce qu'un job en file évincé serait perdu sans trace.
 - La file n'est pas bornée (supposé : un seul utilisateur, quelques URL à la fois).
-- La page ne change pas (supposé : les critères de l'issue portent sur l'API). Soumettre plusieurs URL depuis la page est une suite à ouvrir. Une seule exception : la page garde l'id du job dans `localStorage` sous une clé partagée par les onglets, donc elle ne l'efface que si la clé porte encore l'id du job qui finit. Avec deux onglets, un rechargement reprend le dernier job enfilé, et un onglet n'efface jamais le job en file d'un autre.
+- La page ne change pas (supposé : les critères de l'issue portent sur l'API). Soumettre plusieurs URL depuis la page est la suite, issue #73. Une seule exception : la page garde l'id du job dans `localStorage` sous une clé partagée par les onglets, donc elle ne l'efface que si la clé porte encore l'id du job qui finit. Avec deux onglets, un rechargement reprend le dernier job enfilé, et un onglet n'efface jamais le job en file d'un autre.
 - Le `409` de `POST /jobs/{id}/cancel` pour un job fini reste.
 
 ## Alternatives
