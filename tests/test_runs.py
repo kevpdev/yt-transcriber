@@ -162,7 +162,7 @@ def test_run_without_images_has_an_empty_frames_list():
     assert client.get(f"/runs/{job_id}").json()["frames"] == []
 
 
-def test_two_runs_migration_leaves_the_version_at_four(tmp_path):
+def test_two_runs_migration_leaves_the_current_version(tmp_path):
     path = str(tmp_path / "runs.db")
     RunStore(path)
     assert RunStore(path).query("PRAGMA user_version") == [(5,)]
@@ -228,7 +228,7 @@ def test_schema_is_created_once_in_a_file_database(tmp_path):
     assert second.query("SELECT COUNT(*) FROM runs") == [(1,)]
 
 
-def test_fresh_database_is_empty_at_version_four():
+def test_fresh_database_is_empty_at_the_current_version():
     runs = RunStore(":memory:")
     assert runs.query("PRAGMA user_version") == [(5,)]
     assert runs.query("SELECT COUNT(*) FROM runs") == [(0,)]
