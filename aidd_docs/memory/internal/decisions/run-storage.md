@@ -4,7 +4,7 @@
 - Status: Accepted
 - Supersedes: `aidd_docs/memory/architecture.md`, ligne « Jobs live in memory only », pour les runs terminés, une fois #8 livrée
 
-Source : `aidd_docs/tasks/2026_10/2026_10_09_summary-modes/analysis.md`, section « Stockage des runs ». Porté par #8, puis #48, #49, #50 et #52.
+Source : `aidd_docs/tasks/2026_10/2026_10_09_summary-modes/analysis.md`, section « Stockage des runs ». Porté par #8, puis #48, #49, #50, #52 et #72.
 
 ## Contexte
 
@@ -22,7 +22,7 @@ Chaque run terminé, réussi ou en erreur, est écrit dans une base SQLite, un f
 
 | Table | Contenu | Forme |
 |---|---|---|
-| `runs` | une ligne par run : vidéo, état, erreur, langue, niveau de capture, temps | colonnes SQL |
+| `runs` | une ligne par run : vidéo (dont sa description, #72), état, erreur, langue, niveau de capture, temps | colonnes SQL |
 | `runs`, suite | réglages du modèle, machine, versions (télémétrie de #8) | colonnes JSON texte, lues en bloc et lisibles telles quelles dans un GUI |
 | `segments` | `run_id`, `position`, `start`, `end`, `text`, clé `(run_id, position)` | une ligne par segment, `position` garde l'ordre (#48) |
 | `frames` | `run_id`, horodatage, chemin du fichier | une ligne par image |
