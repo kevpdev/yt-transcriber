@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .transcribe import Segment
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 log = logging.getLogger(__name__)
 
 
@@ -72,6 +72,8 @@ CREATE TABLE frames (
 
 _LEVEL_SCHEMA = "ALTER TABLE runs ADD COLUMN level TEXT NOT NULL DEFAULT 'text'"
 
+_DESCRIPTION_SCHEMA = "ALTER TABLE runs ADD COLUMN description TEXT"
+
 _COLUMNS = (
     "id",
     "video_id",
@@ -79,6 +81,7 @@ _COLUMNS = (
     "title",
     "channel",
     "video_duration",
+    "description",
     "state",
     "error",
     "text",
@@ -150,6 +153,8 @@ class RunStore:
             steps.append(_FRAMES_SCHEMA)
         if version < 4:
             steps.append(_LEVEL_SCHEMA)
+        if version < 5:
+            steps.append(_DESCRIPTION_SCHEMA)
         script = ";\n".join(steps)
         self._db.executescript(
             f"BEGIN;\n{script};\nPRAGMA user_version = {SCHEMA_VERSION};\nCOMMIT;"

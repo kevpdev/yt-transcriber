@@ -26,6 +26,7 @@ class Download:
     title: str | None = None
     channel: str | None = None
     duration: float | None = None
+    description: str | None = None
 
 
 def no_check() -> None:
@@ -73,6 +74,7 @@ def download_audio(
                 title=info.get("title"),
                 channel=info.get("channel") or info.get("uploader"),
                 duration=info.get("duration"),
+                description=info.get("description"),
             )
     except DownloadError as exc:
         raise AudioError(readable_error(str(exc))) from exc

@@ -155,6 +155,7 @@ def create_app(
                 title=meta.title if meta else None,
                 channel=meta.channel if meta else None,
                 video_duration=meta.duration if meta else None,
+                description=meta.description if meta else None,
                 level="frames" if job.frames else "text",
                 state=j.DONE if done else j.ERROR,
                 error=error,

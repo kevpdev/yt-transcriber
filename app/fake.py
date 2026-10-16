@@ -18,6 +18,7 @@ FAKE_TEXT = (
 )
 FAKE_TITLE = "Vidéo factice"
 FAKE_CHANNEL = "Chaîne factice"
+FAKE_DESCRIPTION = "Description factice de la vidéo.\nSources : https://example.com/slides"
 # Long enough to reload the page and cut the network during the job.
 FAKE_DURATION = 10.0
 # Long enough for the page, which polls every 2 s, to show the extracting stage.
@@ -36,7 +37,13 @@ def fake_download(
     on_info(FAKE_TITLE, FAKE_CHANNEL, FAKE_DURATION)
     path = dest_dir / "audio.webm"
     path.touch()
-    return Download(path=path, title=FAKE_TITLE, channel=FAKE_CHANNEL, duration=FAKE_DURATION)
+    return Download(
+        path=path,
+        title=FAKE_TITLE,
+        channel=FAKE_CHANNEL,
+        duration=FAKE_DURATION,
+        description=FAKE_DESCRIPTION,
+    )
 
 
 def fake_segments() -> list[Segment]:
