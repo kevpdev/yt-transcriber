@@ -97,6 +97,10 @@ class Run(Shape):
     title: str | None
     channel: str | None
     video_duration: float | None = Field(description="Seconds.")
+    description: str | None = Field(
+        description="Video description as YouTube shows it, "
+        "null for a run recorded before it was stored."
+    )
     state: State
     error: str | None
     text: str | None

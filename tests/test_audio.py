@@ -57,6 +57,16 @@ def test_a_finished_or_regular_video_is_downloaded(ydl, tmp_path: Path, status):
     assert ydl.downloaded == ["abc"]
 
 
+def test_the_description_of_the_video_comes_out_of_the_download(ydl, tmp_path: Path):
+    ydl.info = {"id": "abc", "description": "Line one\nhttps://example.com"}
+    assert download_audio("u", tmp_path).description == "Line one\nhttps://example.com"
+
+
+def test_the_description_is_none_when_the_video_has_none(ydl, tmp_path: Path):
+    ydl.info = {"id": "abc", "title": "T"}
+    assert download_audio("u", tmp_path).description is None
+
+
 def test_on_info_gets_title_channel_and_duration_before_the_download(ydl, tmp_path: Path):
     ydl.info = {"id": "abc", "title": "T", "uploader": "U", "duration": 12.0}
     seen = []

@@ -39,7 +39,9 @@ class FakeTranscriber:
 def fake_download(url, dest, check=None, on_info=None):
     if on_info:
         on_info("T", "C", 12.0)
-    return Download(path=dest / "a.webm", title="T", channel="C", duration=12.0)
+    return Download(
+        path=dest / "a.webm", title="T", channel="C", duration=12.0, description="D\nline"
+    )
 
 
 def wait_for(client, job_id, stages=(j.DONE, j.ERROR)):
@@ -105,6 +107,14 @@ def test_done_job_exposes_timed_segments_and_keeps_text():
         {"start": 0.0, "end": 1.5, "text": "bonjour"},
         {"start": 1.5, "end": 3.0, "text": "le monde"},
     ]
+
+
+def test_run_carries_the_video_description_but_the_list_does_not():
+    client = TestClient(create_app(FakeTranscriber(), fake_download))
+    wait_for(client, client.post("/jobs", json={"url": URL}).json()["id"])
+    run_id = client.get("/runs/latest").json()["id"]
+    assert client.get(f"/runs/{run_id}").json()["description"] == "D\nline"
+    assert all("description" not in r for r in client.get("/runs").json()["runs"])
 
 
 def test_running_job_has_no_segments_yet():

@@ -18,6 +18,7 @@ The HTTP API surface: its style, where the contract lives, and what the schema c
 ## What the schema does not say
 
 - `GET /jobs/{id}` carries `title`, `channel` and `duration` (seconds), all `null` until the download step knows the video. `download_audio` calls its `on_info` callback between `extract_info` and the download, so the page reads them during `downloading`, a live refused or a download failing before that leaves them `null`. They stay on the job once it is done.
+- `GET /runs/{id}` carries `description`, the video description as YouTube shows it, read from the same `extract_info` call as the title. It is on that route only, not on `GET /runs` nor on the job, and `null` for a run recorded before schema version 5 or a video without one.
 - `POST /jobs` takes an optional `hotwords` string. Missing, `null` or blank after `strip()` means the default (`HOTWORDS`, or `DEFAULT_HOTWORDS` in `app/transcribe.py`). A non-string or more than 500 characters (`MAX_HOTWORDS`, supposed bound) gets the French `422`. The job carries the value, the transcriber receives it and `runs.settings.hotwords` records it. `GET /hotwords` answers `{"default": ...}`, read at call time, so the page can prefill its field.
 
 - Errors are `{"detail": "<message>"}`, written in French for the end user, never a stack trace. The exception is a `POST /jobs` body that is not the expected JSON, which gets the English list of the validation library.
