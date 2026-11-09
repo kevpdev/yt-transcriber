@@ -20,13 +20,14 @@ from .runs import Frame
 
 log = logging.getLogger(__name__)
 
-# Provisional values, calibrated on the reference video by issue #53.
+# Measured on two videos by issue #53, see the section "Calibrage (#53)" of
+# aidd_docs/memory/internal/decisions/frames-pyav.md. scripts/calibrate_frames.py replays them.
 SAMPLE_EVERY_S = 1.0
 THUMB = (64, 36)  # width, height of the grayscale thumbnail compared between samples
 CHANGE_THRESHOLD = 6.0  # mean absolute difference on a 0 to 255 scale
 STABLE_S = 3.0
 HASH_DISTANCE = 6  # bits out of 64
-MAX_FRAMES = 80
+MAX_FRAMES = 200  # 80 cut the 56 min reference video at 47:55
 
 _VIDEO_FORMAT = (
     "bestvideo[height<=720][vcodec^=av01]"

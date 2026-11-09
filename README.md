@@ -43,6 +43,17 @@ Le bouton « Transcrire avec les slides » de la page lance un job qui passe par
 docker compose run --rm --no-deps yt-transcriber python -m app.frames https://www.youtube.com/watch?v=KnXm3PbNz5A /tmp/frames
 ```
 
+Les seuils de la capture ont été mesurés sur deux vidéos (#53), la section « Calibrage (#53) » de `aidd_docs/memory/internal/decisions/frames-pyav.md` les justifie. Pour les remesurer, `scripts/calibrate_frames.py` échantillonne une vidéo une fois, puis rejoue la sélection de l'app sur une grille de seuils et dessine des planches contact dans `calibration/` (ignoré par git) :
+
+```bash
+mkdir -p calibration
+docker compose run --rm --no-deps --build --user "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONPATH=/srv \
+  -v ./scripts:/srv/scripts -v ./calibration:/srv/calibration \
+  --entrypoint python yt-transcriber scripts/calibrate_frames.py sample KnXm3PbNz5A
+```
+
+Les commandes suivantes sont `sweep`, `scene` et `sheet` (`--every 5`, `--params 6,3,6` ou `--scene 0.3`), avec le même préfixe.
+
 Pour le suivre en direct dans un GUI, ouvre `data/runs.db` en lecture seule, par exemple dans DBeaver (connexion SQLite) ou DB Browser for SQLite. Les colonnes `settings`, `machine` et `versions` sont du JSON texte, lisible tel quel, et `json_extract(machine, '$.gpu')` en lit un champ.
 
 Pour passer la version de Docker : `HOST_DOCKER_VERSION=$(docker version -f '{{.Server.Version}}') docker compose up --build`.
