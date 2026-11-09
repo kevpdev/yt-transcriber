@@ -22,7 +22,7 @@ flowchart TD
 - `tests/`: pytest suites for the job flow, the run storage, the published API contract, the URL parsing, the fake mode and the static files, run by `scripts/check.sh`.
 - `e2e/`: Playwright scenarios for the page, run by `scripts/e2e.sh fake|real`, outside `scripts/check.sh`.
 - `aidd_docs/`: the AI memory, the decision records under `memory/internal/decisions/`, and the task plans.
-- Repo root: `Dockerfile`, `compose.yaml`, `entrypoint.sh` for the container, and `scripts/` (`check.sh`, `e2e.sh`).
+- Repo root: `Dockerfile`, `compose.yaml`, `entrypoint.sh` for the container, and `scripts/` (`check.sh`, `e2e.sh`, `calibrate_frames.py`, the bench that measures the slide capture thresholds, run by hand in the app image).
 
 ## Entry points
 
