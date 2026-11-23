@@ -5,6 +5,7 @@ services:
       - "8000:8000"
     environment:
       HOTWORDS: ${HOTWORDS:-Claude Code, Claude, Anthropic, MCP}
+      COMPUTE_TYPE: ${COMPUTE_TYPE:-float16}
       HOST_DOCKER_VERSION: ${HOST_DOCKER_VERSION:-}
     volumes:
       - hf-cache:/hf
