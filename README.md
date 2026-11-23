@@ -27,6 +27,7 @@ Quand un job échoue, la page affiche un message court. La cause complète est d
 | Variable   | Défaut                                | Rôle                                           |
 | ---------- | ------------------------------------- | ---------------------------------------------- |
 | `HOTWORDS` | `Claude Code, Claude, Anthropic, MCP` | termes tech que Whisper doit orthographier juste, valeur par défaut du champ `hotwords` de `POST /jobs` |
+| `COMPUTE_TYPE` | `float16` | précision du modèle Whisper, `int8` pour une carte d'avant Volta (GTX 10xx) qui refuse le float16, enregistrée dans les réglages du run |
 | `HOST_DOCKER_VERSION` | vide | version de Docker gardée dans la télémétrie de chaque run, le conteneur ne peut pas la lire seul |
 
 Exemple : `HOTWORDS="Spring Boot, Kubernetes" docker compose up --build`. Chaque job peut aussi porter ses propres hotwords, par le champ `hotwords` de `POST /jobs`, que remplit l'agent appelant (la page n'a pas de champ) (500 caractères au plus, vide ou absent veut dire la valeur par défaut, lue par `GET /hotwords`). La valeur utilisée est enregistrée dans les réglages du run.

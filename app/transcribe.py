@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 MODEL = "large-v3-turbo"
-COMPUTE_TYPE = "float16"
+DEFAULT_COMPUTE_TYPE = "float16"
 BEAM_SIZE = 5
 VAD_FILTER = True
 CONDITION_ON_PREVIOUS_TEXT = False
@@ -15,10 +15,15 @@ def hotwords() -> str:
     return os.environ.get("HOTWORDS", DEFAULT_HOTWORDS)
 
 
+def compute_type() -> str:
+    # float16 needs a GPU of the Volta generation or later, a GTX 10xx runs int8.
+    return os.environ.get("COMPUTE_TYPE") or DEFAULT_COMPUTE_TYPE
+
+
 def settings(used_hotwords: str | None = None) -> dict:
     return {
         "model": MODEL,
-        "compute_type": COMPUTE_TYPE,
+        "compute_type": compute_type(),
         "beam_size": BEAM_SIZE,
         "vad_filter": VAD_FILTER,
         "condition_on_previous_text": CONDITION_ON_PREVIOUS_TEXT,
@@ -48,7 +53,7 @@ class Transcriber:
     def load(self) -> None:
         from faster_whisper import WhisperModel
 
-        self.model = WhisperModel(MODEL, device="cuda", compute_type=COMPUTE_TYPE)
+        self.model = WhisperModel(MODEL, device="cuda", compute_type=compute_type())
 
     def run(self, audio: Path, on_progress: Callable[[float], None], hotwords: str) -> Transcript:
         if self.model is None:
